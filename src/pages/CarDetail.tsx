@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useParams, Link } from "react-router";
 import {
   ChevronRight,
@@ -21,7 +21,9 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cars } from "@/data/cars";
+import { cars as fallbackCars } from "@/data/cars";
+import { mapApiCarToView, mapApiCarsToView, type CarView } from "@/lib/car-mapper";
+import { createLead, getPublicCar, getPublicCars } from "@/lib/public-api";
 import {
   Dialog,
   DialogContent,
@@ -38,8 +40,93 @@ export default function CarDetail() {
   const [showContact, setShowContact] = useState(false);
   const [showShare, setShowShare] = useState(false);
   const [contactForm, setContactForm] = useState({ name: "", email: "", phone: "", message: "" });
+  const [car, setCar] = useState<CarView | null>(null);
+  const [relatedCars, setRelatedCars] = useState<CarView[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [submitMessage, setSubmitMessage] = useState("");
+  const [submitError, setSubmitError] = useState("");
 
-  const car = cars.find((c) => c.id === Number(id));
+  useEffect(() => {
+    if (!id) return;
+
+    setIsLoading(true);
+    getPublicCar(id)
+      .then((response) => {
+        setCar(mapApiCarToView(response));
+      })
+      .catch(() => {
+        const fallback = fallbackCars.find((c) => String(c.id) === id);
+        setCar(fallback ? { ...fallback, id: String(fallback.id), listingType: "SALE" as const, city: undefined } : null);
+      })
+      .finally(() => setIsLoading(false));
+  }, [id]);
+
+  useEffect(() => {
+    getPublicCars({ page: 1, limit: 6, sortBy: "newest" })
+      .then((response) => setRelatedCars(mapApiCarsToView(response.items).filter((c) => c.id !== id).slice(0, 3)))
+      .catch(() => {
+        setRelatedCars(
+          fallbackCars
+            .filter((c) => String(c.id) !== id)
+            .slice(0, 3)
+            .map((c) => ({ ...c, id: String(c.id), listingType: "SALE" as const, city: undefined }))
+        );
+      });
+  }, [id]);
+
+  const handleLeadSubmit = async () => {
+    if (!car) return;
+    setSubmitMessage("");
+    setSubmitError("");
+
+    try {
+      if (!contactForm.name || !contactForm.phone) {
+        throw new Error("Name and phone number are required.");
+      }
+      const response = await createLead({
+        carId: car.id,
+        intent: "BUY",
+        fullName: contactForm.name,
+        phone: contactForm.phone,
+        email: contactForm.email || undefined,
+        message: contactForm.message || `Interested in ${car.brand} ${car.model}`,
+        requestDelivery: false,
+      });
+      setSubmitMessage(response.message || "Your request has been received.");
+      setContactForm({ name: "", email: "", phone: "", message: "" });
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : "Could not send your request.");
+    }
+  };
+
+  const handleShareAction = async (name: string) => {
+    if (!car) return;
+    const shareUrl = window.location.href;
+    const shareText = `${car.brand} ${car.model} - ${shareUrl}`;
+
+    if (name === "Copy Link") {
+      await navigator.clipboard?.writeText(shareUrl);
+      setShowShare(false);
+      return;
+    }
+    if (name === "WhatsApp") {
+      window.open(`https://wa.me/?text=${encodeURIComponent(shareText)}`, "_blank");
+      return;
+    }
+    if (name === "Email") {
+      window.location.href = `mailto:?subject=${encodeURIComponent(`${car.brand} ${car.model}`)}&body=${encodeURIComponent(shareText)}`;
+      return;
+    }
+    window.location.href = `sms:?body=${encodeURIComponent(shareText)}`;
+  };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-dark flex items-center justify-center pt-20">
+        <div className="text-gold font-semibold">Loading vehicle...</div>
+      </div>
+    );
+  }
 
   if (!car) {
     return (
@@ -55,8 +142,6 @@ export default function CarDetail() {
       </div>
     );
   }
-
-  const relatedCars = cars.filter((c) => c.id !== car.id && c.category === car.category).slice(0, 3);
 
   const specs = [
     { icon: Calendar, label: "Year", value: car.year },
@@ -212,6 +297,7 @@ export default function CarDetail() {
                 </Button>
                 <Button
                   variant="outline"
+                  onClick={() => setShowContact(true)}
                   className="border-gold/30 text-gold hover:bg-gold/10 py-6"
                 >
                   <MessageSquare className="w-5 h-5 mr-2" />
@@ -380,7 +466,17 @@ export default function CarDetail() {
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30 min-h-[100px]"
               />
             </div>
-            <Button className="w-full bg-gold hover:bg-gold-light text-dark font-bold">
+            {submitMessage && (
+              <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-300">
+                {submitMessage}
+              </div>
+            )}
+            {submitError && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                {submitError}
+              </div>
+            )}
+            <Button onClick={handleLeadSubmit} className="w-full bg-gold hover:bg-gold-light text-dark font-bold">
               <Mail className="w-5 h-5 mr-2" />
               Send Message
             </Button>
@@ -403,6 +499,7 @@ export default function CarDetail() {
             ].map((item) => (
               <button
                 key={item.name}
+                onClick={() => handleShareAction(item.name)}
                 className="flex flex-col items-center gap-2 p-3 bg-dark border border-gold/20 rounded-lg hover:border-gold/50 transition-colors"
               >
                 <item.icon className="w-6 h-6 text-gold" />

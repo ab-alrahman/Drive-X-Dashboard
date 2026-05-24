@@ -25,46 +25,274 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cars } from "@/data/cars";
+import { cars as fallbackCars } from "@/data/cars";
+import {
+  createAdminCar,
+  deleteAdminCar,
+  getAdminCars,
+  getAdminDashboardSummary,
+  getAdminLeads,
+  updateAdminCar,
+  updateAdminLead,
+} from "@/lib/admin-api";
+import { clearAuthTokens, getAccessToken } from "@/lib/api";
+import { getCurrentAdmin, logoutAdmin } from "@/lib/auth-api";
+import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
+import type { ApiCar, CarPayload, DashboardSummaryResponse, LeadResponse } from "@/lib/api-types";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { Textarea } from "@/components/ui/textarea";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+
+const emptyCarForm = {
+  brand: "",
+  model: "",
+  year: "2024",
+  listingType: "SALE",
+  condition: "USED",
+  status: "AVAILABLE",
+  salePriceAmount: "",
+  dailyRentPriceAmount: "",
+  monthlyRentPriceAmount: "",
+  mileageKm: "",
+  transmission: "AUTOMATIC",
+  fuelType: "GASOLINE",
+  color: "",
+  city: "",
+  engine: "",
+  seats: "5",
+  horsepower: "",
+  description: "",
+};
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [dashboardSummary, setDashboardSummary] = useState<DashboardSummaryResponse | null>(null);
+  const [adminCars, setAdminCars] = useState<ApiCar[]>([]);
+  const [dashboardCars, setDashboardCars] = useState<CarView[]>(
+    fallbackCars.map((car) => ({ ...car, id: String(car.id), listingType: "SALE" as const, city: undefined }))
+  );
+  const [leads, setLeads] = useState<LeadResponse[]>([]);
+  const [dashboardError, setDashboardError] = useState("");
+  const [actionMessage, setActionMessage] = useState("");
+  const [carDialogOpen, setCarDialogOpen] = useState(false);
+  const [editingCarId, setEditingCarId] = useState<string | null>(null);
+  const [carForm, setCarForm] = useState(emptyCarForm);
+  const [isSavingCar, setIsSavingCar] = useState(false);
+  const [carSearch, setCarSearch] = useState("");
 
   useEffect(() => {
-    const auth = localStorage.getItem("drive_x_auth");
-    if (!auth) {
+    if (!getAccessToken()) {
       navigate("/login");
       return;
     }
-    try {
-      setUser(JSON.parse(auth));
-    } catch {
-      navigate("/login");
+
+    const auth = localStorage.getItem("drive_x_auth");
+    if (auth) {
+      try {
+        setUser(JSON.parse(auth));
+      } catch {
+        clearAuthTokens();
+        navigate("/login");
+        return;
+      }
     }
+
+    getCurrentAdmin()
+      .then((admin) => {
+        setUser({ name: admin.fullName ?? "Admin User", email: admin.email });
+      })
+      .catch(() => {
+        navigate("/login");
+      });
   }, [navigate]);
 
-  const handleLogout = () => {
-    localStorage.removeItem("drive_x_auth");
+  const refreshDashboardData = async () => {
+    if (!getAccessToken()) return;
+
+    const [summary, carsResponse, leadsResponse] = await Promise.all([
+      getAdminDashboardSummary(),
+      getAdminCars({ page: 1, limit: 20 }),
+      getAdminLeads({ page: 1, limit: 20 }),
+    ]);
+    setDashboardSummary(summary);
+    setAdminCars(carsResponse.items);
+    const cars = mapApiCarsToView(carsResponse.items);
+    if (cars.length > 0) {
+      setDashboardCars(cars);
+    }
+    setLeads(leadsResponse.items);
+    setDashboardError("");
+  };
+
+  useEffect(() => {
+    refreshDashboardData().catch((error: Error) => {
+      setDashboardError(error.message || "Could not load dashboard data.");
+    });
+  }, []);
+
+  const handleLogout = async () => {
+    await logoutAdmin();
     navigate("/");
   };
 
+  const openCreateCar = () => {
+    setEditingCarId(null);
+    setCarForm(emptyCarForm);
+    setCarDialogOpen(true);
+  };
+
+  const openEditCar = (carId: string) => {
+    const car = adminCars.find((item) => item.id === carId);
+    if (!car) return;
+    setEditingCarId(car.id);
+    setCarForm({
+      brand: car.brand,
+      model: car.model,
+      year: String(car.year),
+      listingType: car.listingType,
+      condition: car.condition,
+      status: car.status,
+      salePriceAmount: car.salePrice?.amount ? String(car.salePrice.amount) : "",
+      dailyRentPriceAmount: car.dailyRentPrice?.amount ? String(car.dailyRentPrice.amount) : "",
+      monthlyRentPriceAmount: car.monthlyRentPrice?.amount ? String(car.monthlyRentPrice.amount) : "",
+      mileageKm: typeof car.mileageKm === "number" ? String(car.mileageKm) : "",
+      transmission: car.transmission ?? "AUTOMATIC",
+      fuelType: car.fuelType ?? "GASOLINE",
+      color: car.color ?? "",
+      city: car.city ?? "",
+      engine: car.specs.engine,
+      seats: String(car.specs.seats),
+      horsepower: car.specs.horsepower ? String(car.specs.horsepower) : "",
+      description: car.description ?? "",
+    });
+    setCarDialogOpen(true);
+  };
+
+  const carPayloadFromForm = (): CarPayload => ({
+    brand: carForm.brand,
+    model: carForm.model,
+    year: Number(carForm.year),
+    listingType: carForm.listingType as CarPayload["listingType"],
+    condition: carForm.condition as CarPayload["condition"],
+    status: carForm.status as CarPayload["status"],
+    salePrice: carForm.salePriceAmount
+      ? { amount: Number(carForm.salePriceAmount), currency: "USD" }
+      : undefined,
+    dailyRentPrice: carForm.dailyRentPriceAmount
+      ? { amount: Number(carForm.dailyRentPriceAmount), currency: "USD" }
+      : undefined,
+    monthlyRentPrice: carForm.monthlyRentPriceAmount
+      ? { amount: Number(carForm.monthlyRentPriceAmount), currency: "USD" }
+      : undefined,
+    mileageKm: carForm.mileageKm ? Number(carForm.mileageKm) : undefined,
+    transmission: carForm.transmission as CarPayload["transmission"],
+    fuelType: carForm.fuelType as CarPayload["fuelType"],
+    color: carForm.color || undefined,
+    city: carForm.city || undefined,
+    specs: {
+      engine: carForm.engine,
+      seats: Number(carForm.seats),
+      horsepower: carForm.horsepower ? Number(carForm.horsepower) : undefined,
+    },
+    description: carForm.description || undefined,
+  });
+
+  const handleSaveCar = async () => {
+    setIsSavingCar(true);
+    setDashboardError("");
+    setActionMessage("");
+    try {
+      if (!carForm.brand || !carForm.model || !carForm.engine || !carForm.seats) {
+        throw new Error("Brand, model, engine, and seats are required.");
+      }
+      if ((carForm.listingType === "SALE" || carForm.listingType === "BOTH") && !carForm.salePriceAmount) {
+        throw new Error("Sale listings require a sale price.");
+      }
+      if (
+        (carForm.listingType === "RENT" || carForm.listingType === "BOTH") &&
+        !carForm.dailyRentPriceAmount &&
+        !carForm.monthlyRentPriceAmount
+      ) {
+        throw new Error("Rent listings require a daily or monthly rent price.");
+      }
+      if (editingCarId) {
+        await updateAdminCar(editingCarId, carPayloadFromForm());
+        setActionMessage("Car updated successfully.");
+      } else {
+        await createAdminCar(carPayloadFromForm());
+        setActionMessage("Car created successfully.");
+      }
+      setCarDialogOpen(false);
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not save car.");
+    } finally {
+      setIsSavingCar(false);
+    }
+  };
+
+  const handleDeleteCar = async (carId: string) => {
+    const confirmed = window.confirm("Soft delete this car?");
+    if (!confirmed) return;
+    try {
+      await deleteAdminCar(carId);
+      setActionMessage("Car deleted successfully.");
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not delete car.");
+    }
+  };
+
+  const handleLeadStatusChange = async (leadId: string, status: string) => {
+    try {
+      await updateAdminLead(leadId, { status });
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not update lead.");
+    }
+  };
+
   const stats = [
-    { label: "Total Cars", value: "156", change: "+12", icon: Car, trend: "up" },
-    { label: "Active Listings", value: "89", change: "+5", icon: Activity, trend: "up" },
-    { label: "Total Sales", value: "$2.4M", change: "+18%", icon: DollarSign, trend: "up" },
-    { label: "New Inquiries", value: "24", change: "-3", icon: MessageSquare, trend: "down" },
+    { label: "Total Cars", value: String(dashboardSummary?.totalCars ?? dashboardCars.length), change: "Live", icon: Car, trend: "up" },
+    { label: "Active Listings", value: String(dashboardSummary?.availableCars ?? dashboardCars.filter((car) => car.status === "available").length), change: "Live", icon: Activity, trend: "up" },
+    {
+      label: "Monthly Commission",
+      value: dashboardSummary
+        ? `${dashboardSummary.monthlyCommission.amount.toLocaleString()} ${dashboardSummary.monthlyCommission.currency}`
+        : "$0",
+      change: `${Math.round((dashboardSummary?.conversionRate ?? 0) * 100)}%`,
+      icon: DollarSign,
+      trend: "up",
+    },
+    { label: "New Inquiries", value: String(dashboardSummary?.activeLeads ?? leads.length), change: "Live", icon: MessageSquare, trend: "up" },
   ];
 
-  const recentCars = cars.slice(0, 5);
-  const inquiries = [
-    { id: 1, name: "Ahmed Al-Rashid", email: "ahmed@email.com", phone: "+966 50 123 4567", car: "BMW M8 Competition", status: "New", date: "2024-01-15" },
-    { id: 2, name: "Khalid Bin Saad", email: "khalid@email.com", phone: "+966 55 987 6543", car: "Porsche Taycan Turbo S", status: "Contacted", date: "2024-01-14" },
-    { id: 3, name: "Mohammed Al-Farsi", email: "mohammed@email.com", phone: "+966 54 456 7890", car: "Ferrari SF90 Stradale", status: "Pending", date: "2024-01-13" },
-    { id: 4, name: "Faisal Al-Otaibi", email: "faisal@email.com", phone: "+966 56 789 0123", car: "Mercedes G63 AMG", status: "Closed", date: "2024-01-12" },
-    { id: 5, name: "Sultan Al-Qahtani", email: "sultan@email.com", phone: "+966 59 234 5678", car: "Audi RS7 Sportback", status: "New", date: "2024-01-11" },
-  ];
+  const recentCars = dashboardCars.slice(0, 5);
+  const filteredDashboardCars = dashboardCars.filter((car) =>
+    `${car.brand} ${car.model} ${car.category} ${car.city ?? ""}`
+      .toLowerCase()
+      .includes(carSearch.toLowerCase())
+  );
+  const inquiries = leads.map((lead) => {
+    const car = dashboardCars.find((item) => item.id === lead.carId);
+    return {
+      id: lead.id,
+      name: lead.fullName,
+      email: lead.email ?? "No email",
+      phone: lead.phone,
+      car: car ? `${car.brand} ${car.model}` : lead.carId,
+      status: lead.status,
+      date: new Date(lead.createdAt).toLocaleDateString(),
+    };
+  });
 
   const sidebarItems = [
     { id: "overview", label: "Overview", icon: LayoutDashboard },
@@ -143,7 +371,10 @@ export default function Dashboard() {
                     className="pl-9 bg-dark-card border-gold/20 text-white placeholder:text-white/30 w-48"
                   />
                 </div>
-                <button className="relative w-10 h-10 rounded-lg bg-dark-card border border-gold/20 flex items-center justify-center text-white/60 hover:text-gold transition-colors">
+                <button
+                  onClick={() => setActiveTab("inquiries")}
+                  className="relative w-10 h-10 rounded-lg bg-dark-card border border-gold/20 flex items-center justify-center text-white/60 hover:text-gold transition-colors"
+                >
                   <Bell className="w-5 h-5" />
                   <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gold text-dark text-[10px] font-bold flex items-center justify-center">
                     3
@@ -151,6 +382,17 @@ export default function Dashboard() {
                 </button>
               </div>
             </div>
+
+            {dashboardError && (
+              <div className="mb-6 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm text-orange-300">
+                {dashboardError}
+              </div>
+            )}
+            {actionMessage && (
+              <div className="mb-6 rounded-lg border border-green-500/30 bg-green-500/10 px-4 py-3 text-sm text-green-300">
+                {actionMessage}
+              </div>
+            )}
 
             {/* Overview Tab */}
             {activeTab === "overview" && (
@@ -209,11 +451,11 @@ export default function Dashboard() {
                           </div>
                           <span
                             className={`text-xs px-2 py-1 rounded-full shrink-0 ${
-                              inquiry.status === "New"
+                              inquiry.status === "NEW"
                                 ? "bg-green-500/10 text-green-400"
-                                : inquiry.status === "Contacted"
+                                : inquiry.status === "CONTACTED"
                                 ? "bg-blue-500/10 text-blue-400"
-                                : inquiry.status === "Pending"
+                                : inquiry.status === "NEGOTIATING" || inquiry.status === "APPROVED"
                                 ? "bg-orange-500/10 text-orange-400"
                                 : "bg-white/10 text-white/60"
                             }`}
@@ -284,6 +526,7 @@ export default function Dashboard() {
                     </Link>
                     <Button
                       variant="outline"
+                      onClick={openCreateCar}
                       className="w-full h-24 border-gold/20 hover:border-gold/50 hover:bg-gold/5 flex flex-col items-center gap-2"
                     >
                       <Plus className="w-6 h-6 text-gold" />
@@ -291,6 +534,7 @@ export default function Dashboard() {
                     </Button>
                     <Button
                       variant="outline"
+                      onClick={() => setActiveTab("inquiries")}
                       className="w-full h-24 border-gold/20 hover:border-gold/50 hover:bg-gold/5 flex flex-col items-center gap-2"
                     >
                       <MessageSquare className="w-6 h-6 text-gold" />
@@ -309,10 +553,12 @@ export default function Dashboard() {
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                     <Input
                       placeholder="Search cars..."
+                      value={carSearch}
+                      onChange={(event) => setCarSearch(event.target.value)}
                       className="pl-9 bg-dark-card border-gold/20 text-white placeholder:text-white/30 w-64"
                     />
                   </div>
-                  <Button className="bg-gold hover:bg-gold-light text-dark">
+                  <Button onClick={openCreateCar} className="bg-gold hover:bg-gold-light text-dark">
                     <Plus className="w-4 h-4 mr-2" />
                     Add New Car
                   </Button>
@@ -332,7 +578,7 @@ export default function Dashboard() {
                         </tr>
                       </thead>
                       <tbody>
-                        {cars.map((car) => (
+                        {filteredDashboardCars.map((car) => (
                           <tr key={car.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
                             <td className="px-4 py-3">
                               <div className="flex items-center gap-3">
@@ -367,10 +613,20 @@ export default function Dashboard() {
                                     <ArrowUpRight className="w-4 h-4" />
                                   </Button>
                                 </Link>
-                                <Button variant="ghost" size="sm" className="text-white/50 hover:text-white hover:bg-white/10 h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditCar(car.id)}
+                                  className="text-white/50 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+                                >
                                   <Edit3 className="w-4 h-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleDeleteCar(car.id)}
+                                  className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0"
+                                >
                                   <Trash2 className="w-4 h-4" />
                                 </Button>
                               </div>
@@ -416,21 +672,36 @@ export default function Dashboard() {
                             <td className="px-4 py-3 text-white/60 text-sm">{inquiry.car}</td>
                             <td className="px-4 py-3 text-white/60 text-sm">{inquiry.date}</td>
                             <td className="px-4 py-3">
-                              <span className={`text-xs px-2 py-1 rounded-full ${
-                                inquiry.status === "New" ? "bg-green-500/10 text-green-400" :
-                                inquiry.status === "Contacted" ? "bg-blue-500/10 text-blue-400" :
-                                inquiry.status === "Pending" ? "bg-orange-500/10 text-orange-400" :
-                                "bg-white/10 text-white/60"
-                              }`}>
-                                {inquiry.status}
-                              </span>
+                              <Select
+                                value={inquiry.status}
+                                onValueChange={(status) => handleLeadStatusChange(inquiry.id, status)}
+                              >
+                                <SelectTrigger className="h-8 w-36 bg-dark border-gold/20 text-white text-xs">
+                                  <SelectValue />
+                                </SelectTrigger>
+                                <SelectContent className="bg-dark-card border-gold/20">
+                                  {["NEW", "CONTACTED", "NEGOTIATING", "APPROVED", "REJECTED", "CLOSED"].map((status) => (
+                                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                                  ))}
+                                </SelectContent>
+                              </Select>
                             </td>
                             <td className="px-4 py-3">
                               <div className="flex items-center justify-end gap-2">
-                                <Button variant="ghost" size="sm" className="text-gold hover:bg-gold/10 h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => window.location.href = `tel:${inquiry.phone}`}
+                                  className="text-gold hover:bg-gold/10 h-8 w-8 p-0"
+                                >
                                   <Phone className="w-4 h-4" />
                                 </Button>
-                                <Button variant="ghost" size="sm" className="text-gold hover:bg-gold/10 h-8 w-8 p-0">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => inquiry.email !== "No email" && (window.location.href = `mailto:${inquiry.email}`)}
+                                  className="text-gold hover:bg-gold/10 h-8 w-8 p-0"
+                                >
                                   <Mail className="w-4 h-4" />
                                 </Button>
                               </div>
@@ -448,7 +719,7 @@ export default function Dashboard() {
             {activeTab === "favorites" && (
               <div className="space-y-6">
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {cars.slice(0, 4).map((car) => (
+                  {dashboardCars.slice(0, 4).map((car) => (
                     <Link
                       key={car.id}
                       to={`/car/${car.id}`}
@@ -545,7 +816,10 @@ export default function Dashboard() {
                       <label className="text-white/60 text-sm mb-2 block">Address</label>
                       <Input defaultValue="King Fahd Road, Riyadh 11321, Saudi Arabia" className="bg-dark border-gold/20 text-white" />
                     </div>
-                    <Button className="bg-gold hover:bg-gold-light text-dark font-bold mt-4">
+                    <Button
+                      onClick={() => setActionMessage("Profile settings endpoint is not available in the backend API yet.")}
+                      className="bg-gold hover:bg-gold-light text-dark font-bold mt-4"
+                    >
                       Save Changes
                     </Button>
                   </div>
@@ -576,6 +850,169 @@ export default function Dashboard() {
           </div>
         </div>
       </div>
+
+      <Dialog open={carDialogOpen} onOpenChange={setCarDialogOpen}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-3xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">
+              {editingCarId ? "Edit Car" : "Add New Car"}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <Input
+              placeholder="Brand"
+              value={carForm.brand}
+              onChange={(event) => setCarForm({ ...carForm, brand: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              placeholder="Model"
+              value={carForm.model}
+              onChange={(event) => setCarForm({ ...carForm, model: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              type="number"
+              placeholder="Year"
+              value={carForm.year}
+              onChange={(event) => setCarForm({ ...carForm, year: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              type="number"
+              placeholder="Sale price USD"
+              value={carForm.salePriceAmount}
+              onChange={(event) => setCarForm({ ...carForm, salePriceAmount: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              type="number"
+              placeholder="Daily rent USD"
+              value={carForm.dailyRentPriceAmount}
+              onChange={(event) => setCarForm({ ...carForm, dailyRentPriceAmount: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              type="number"
+              placeholder="Monthly rent USD"
+              value={carForm.monthlyRentPriceAmount}
+              onChange={(event) => setCarForm({ ...carForm, monthlyRentPriceAmount: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Select value={carForm.listingType} onValueChange={(value) => setCarForm({ ...carForm, listingType: value })}>
+              <SelectTrigger className="bg-dark border-gold/20 text-white">
+                <SelectValue placeholder="Listing type" />
+              </SelectTrigger>
+              <SelectContent className="bg-dark-card border-gold/20">
+                <SelectItem value="SALE">SALE</SelectItem>
+                <SelectItem value="RENT">RENT</SelectItem>
+                <SelectItem value="BOTH">BOTH</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={carForm.status} onValueChange={(value) => setCarForm({ ...carForm, status: value })}>
+              <SelectTrigger className="bg-dark border-gold/20 text-white">
+                <SelectValue placeholder="Status" />
+              </SelectTrigger>
+              <SelectContent className="bg-dark-card border-gold/20">
+                {["AVAILABLE", "RESERVED", "SOLD", "RENTED", "INACTIVE"].map((status) => (
+                  <SelectItem key={status} value={status}>{status}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={carForm.condition} onValueChange={(value) => setCarForm({ ...carForm, condition: value })}>
+              <SelectTrigger className="bg-dark border-gold/20 text-white">
+                <SelectValue placeholder="Condition" />
+              </SelectTrigger>
+              <SelectContent className="bg-dark-card border-gold/20">
+                <SelectItem value="NEW">NEW</SelectItem>
+                <SelectItem value="USED">USED</SelectItem>
+              </SelectContent>
+            </Select>
+            <Select value={carForm.fuelType} onValueChange={(value) => setCarForm({ ...carForm, fuelType: value })}>
+              <SelectTrigger className="bg-dark border-gold/20 text-white">
+                <SelectValue placeholder="Fuel type" />
+              </SelectTrigger>
+              <SelectContent className="bg-dark-card border-gold/20">
+                {["GASOLINE", "DIESEL", "HYBRID", "ELECTRIC"].map((fuel) => (
+                  <SelectItem key={fuel} value={fuel}>{fuel}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+            <Select value={carForm.transmission} onValueChange={(value) => setCarForm({ ...carForm, transmission: value })}>
+              <SelectTrigger className="bg-dark border-gold/20 text-white">
+                <SelectValue placeholder="Transmission" />
+              </SelectTrigger>
+              <SelectContent className="bg-dark-card border-gold/20">
+                <SelectItem value="AUTOMATIC">AUTOMATIC</SelectItem>
+                <SelectItem value="MANUAL">MANUAL</SelectItem>
+              </SelectContent>
+            </Select>
+            <Input
+              type="number"
+              placeholder="Mileage km"
+              value={carForm.mileageKm}
+              onChange={(event) => setCarForm({ ...carForm, mileageKm: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              placeholder="Color"
+              value={carForm.color}
+              onChange={(event) => setCarForm({ ...carForm, color: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              placeholder="City"
+              value={carForm.city}
+              onChange={(event) => setCarForm({ ...carForm, city: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              placeholder="Engine"
+              value={carForm.engine}
+              onChange={(event) => setCarForm({ ...carForm, engine: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              type="number"
+              placeholder="Seats"
+              value={carForm.seats}
+              onChange={(event) => setCarForm({ ...carForm, seats: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Input
+              type="number"
+              placeholder="Horsepower"
+              value={carForm.horsepower}
+              onChange={(event) => setCarForm({ ...carForm, horsepower: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <Textarea
+              placeholder="Description"
+              value={carForm.description}
+              onChange={(event) => setCarForm({ ...carForm, description: event.target.value })}
+              className="sm:col-span-2 bg-dark border-gold/20 text-white min-h-28"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setCarDialogOpen(false)}
+              className="border-gold/30 text-gold hover:bg-gold/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveCar}
+              disabled={isSavingCar}
+              className="bg-gold hover:bg-gold-light text-dark font-bold"
+            >
+              {isSavingCar ? "Saving..." : "Save Car"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

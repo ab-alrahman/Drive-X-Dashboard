@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link } from "react-router";
 import { Eye, EyeOff, UserPlus, Car, ArrowLeft, Mail, Lock, User, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -18,7 +18,6 @@ export default function Register() {
   const [agreed, setAgreed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
-  const navigate = useNavigate();
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
@@ -39,11 +38,7 @@ export default function Register() {
 
     setIsLoading(true);
     setTimeout(() => {
-      localStorage.setItem("drive_x_auth", JSON.stringify({ 
-        email: formData.email, 
-        name: `${formData.firstName} ${formData.lastName}` 
-      }));
-      navigate("/dashboard");
+      setError("Public registration is not available in the backend API yet. Please use admin login.");
       setIsLoading(false);
     }, 1500);
   };

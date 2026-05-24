@@ -4,6 +4,7 @@ import { Eye, EyeOff, LogIn, Car, ArrowLeft, Mail, Lock } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { getCurrentAdmin, loginAdmin } from "@/lib/auth-api";
 
 export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
@@ -19,15 +20,29 @@ export default function Login() {
     setError("");
     setIsLoading(true);
 
-    setTimeout(() => {
-      if (email && password) {
-        localStorage.setItem("drive_x_auth", JSON.stringify({ email, name: "Admin User" }));
-        navigate("/dashboard");
-      } else {
-        setError("Please enter both email and password");
-      }
+    if (!email || !password) {
+      setError("Please enter both email and password");
       setIsLoading(false);
-    }, 1500);
+      return;
+    }
+
+    try {
+      await loginAdmin(email, password);
+      const admin = await getCurrentAdmin().catch(() => undefined);
+      localStorage.setItem(
+        "drive_x_auth",
+        JSON.stringify({
+          email: admin?.email ?? email,
+          name: admin?.fullName ?? "Admin User",
+          role: admin?.role ?? "OWNER",
+        })
+      );
+      navigate("/dashboard");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Login failed");
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   return (

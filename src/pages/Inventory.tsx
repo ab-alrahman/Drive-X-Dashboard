@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { Link } from "react-router";
+import { useEffect, useState } from "react";
+import { Link, useSearchParams } from "react-router";
 import {
   Search,
   SlidersHorizontal,
@@ -28,27 +28,50 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cars, categories, brands, fuelTypes, type Car } from "@/data/cars";
+import { cars as fallbackCars, categories, brands, fuelTypes } from "@/data/cars";
+import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
+import { getPublicCars } from "@/lib/public-api";
 
 export default function Inventory() {
-  const [searchQuery, setSearchQuery] = useState("");
-  const [selectedCategory, setSelectedCategory] = useState("All");
-  const [selectedBrand, setSelectedBrand] = useState("All");
+  const [searchParams] = useSearchParams();
+  const [searchQuery, setSearchQuery] = useState(searchParams.get("search") ?? "");
+  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") ?? "All");
+  const [selectedBrand, setSelectedBrand] = useState(searchParams.get("brand") ?? "All");
   const [selectedFuel, setSelectedFuel] = useState("All");
-  const [priceRange, setPriceRange] = useState("All");
+  const [priceRange, setPriceRange] = useState(searchParams.get("priceRange") ?? "All");
   const [sortBy, setSortBy] = useState("featured");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
-  const [favorites, setFavorites] = useState<number[]>([]);
-  const [selectedCar, setSelectedCar] = useState<Car | null>(null);
+  const [favorites, setFavorites] = useState<string[]>([]);
+  const [selectedCar, setSelectedCar] = useState<CarView | null>(null);
   const [showFilters, setShowFilters] = useState(false);
+  const [inventoryCars, setInventoryCars] = useState<CarView[]>(
+    fallbackCars.map((car) => ({ ...car, id: String(car.id), listingType: "SALE" as const, city: undefined }))
+  );
+  const [isLoadingCars, setIsLoadingCars] = useState(true);
+  const [carsError, setCarsError] = useState("");
 
-  const toggleFavorite = (id: number) => {
+  useEffect(() => {
+    getPublicCars({ page: 1, limit: 50, sortBy: "newest" })
+      .then((response) => {
+        const cars = mapApiCarsToView(response.items);
+        if (cars.length > 0) {
+          setInventoryCars(cars);
+        }
+        setCarsError("");
+      })
+      .catch((error: Error) => {
+        setCarsError(error.message || "Could not load live inventory. Showing sample vehicles.");
+      })
+      .finally(() => setIsLoadingCars(false));
+  }, []);
+
+  const toggleFavorite = (id: string) => {
     setFavorites((prev) =>
       prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
     );
   };
 
-  const filteredCars = cars.filter((car) => {
+  const filteredCars = inventoryCars.filter((car) => {
     const matchesSearch =
       !searchQuery ||
       car.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -107,7 +130,7 @@ export default function Inventory() {
                 Our Inventory
               </h1>
               <p className="text-white/60 mt-2">
-                {sortedCars.length} vehicles available
+                {isLoadingCars ? "Loading inventory..." : `${sortedCars.length} vehicles available`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -149,6 +172,12 @@ export default function Inventory() {
             </div>
           </div>
         </div>
+
+        {carsError && (
+          <div className="mb-6 rounded-lg border border-orange-500/30 bg-orange-500/10 px-4 py-3 text-sm text-orange-300">
+            {carsError}
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="bg-dark-card border border-gold/20 rounded-xl p-4 mb-6">

@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link } from "react-router";
+import { Link, useNavigate } from "react-router";
 import {
   ChevronRight,
   Car,
@@ -18,17 +18,44 @@ import {
   Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cars, testimonials, stats, categories } from "@/data/cars";
+import { cars as fallbackCars, testimonials, stats, categories, brands } from "@/data/cars";
+import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
+import { getPublicCars } from "@/lib/public-api";
 
 export default function Home() {
+  const navigate = useNavigate();
   const [heroLoaded, setHeroLoaded] = useState(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
+  const [quickSearch, setQuickSearch] = useState({ category: "All", brand: "All", priceRange: "All" });
+  const [featuredCars, setFeaturedCars] = useState<CarView[]>(
+    fallbackCars
+      .filter((c) => c.featured)
+      .slice(0, 4)
+      .map((car) => ({ ...car, id: String(car.id), listingType: "SALE" as const, city: undefined }))
+  );
 
   useEffect(() => {
     setHeroLoaded(true);
   }, []);
 
-  const featuredCars = cars.filter((c) => c.featured).slice(0, 4);
+  const handleQuickSearch = () => {
+    const params = new URLSearchParams();
+    if (quickSearch.category !== "All") params.set("category", quickSearch.category);
+    if (quickSearch.brand !== "All") params.set("brand", quickSearch.brand);
+    if (quickSearch.priceRange !== "All") params.set("priceRange", quickSearch.priceRange);
+    navigate(`/inventory${params.toString() ? `?${params.toString()}` : ""}`);
+  };
+
+  useEffect(() => {
+    getPublicCars({ page: 1, limit: 4, sortBy: "newest" })
+      .then((response) => {
+        const cars = mapApiCarsToView(response.items);
+        if (cars.length > 0) {
+          setFeaturedCars(cars);
+        }
+      })
+      .catch(() => undefined);
+  }, []);
 
   return (
     <div className="min-h-screen bg-dark">
@@ -124,7 +151,11 @@ export default function Home() {
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
               <label className="text-white/60 text-sm">Category</label>
-              <select className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold">
+              <select
+                value={quickSearch.category}
+                onChange={(event) => setQuickSearch({ ...quickSearch, category: event.target.value })}
+                className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold"
+              >
                 {categories.map((c) => (
                   <option key={c} value={c}>
                     {c}
@@ -134,31 +165,38 @@ export default function Home() {
             </div>
             <div className="space-y-2">
               <label className="text-white/60 text-sm">Brand</label>
-              <select className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold">
-                <option>All Brands</option>
-                <option>BMW</option>
-                <option>Porsche</option>
-                <option>Ferrari</option>
-                <option>Mercedes</option>
+              <select
+                value={quickSearch.brand}
+                onChange={(event) => setQuickSearch({ ...quickSearch, brand: event.target.value })}
+                className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold"
+              >
+                {brands.map((brand) => (
+                  <option key={brand} value={brand}>{brand === "All" ? "All Brands" : brand}</option>
+                ))}
               </select>
             </div>
             <div className="space-y-2">
               <label className="text-white/60 text-sm">Price Range</label>
-              <select className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold">
-                <option>Any Price</option>
-                <option>Under $100k</option>
-                <option>$100k - $200k</option>
-                <option>$200k - $500k</option>
-                <option>Above $500k</option>
+              <select
+                value={quickSearch.priceRange}
+                onChange={(event) => setQuickSearch({ ...quickSearch, priceRange: event.target.value })}
+                className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold"
+              >
+                <option value="All">Any Price</option>
+                <option value="under100">Under $100k</option>
+                <option value="100to200">$100k - $200k</option>
+                <option value="200to500">$200k - $500k</option>
+                <option value="over500">Above $500k</option>
               </select>
             </div>
             <div className="flex items-end">
-              <Link to="/inventory" className="w-full">
-                <Button className="w-full bg-gold hover:bg-gold-light text-dark font-bold py-6 shadow-glow hover:shadow-glow-lg transition-all">
-                  <Search className="w-5 h-5 mr-2" />
-                  Search Cars
-                </Button>
-              </Link>
+              <Button
+                onClick={handleQuickSearch}
+                className="w-full bg-gold hover:bg-gold-light text-dark font-bold py-6 shadow-glow hover:shadow-glow-lg transition-all"
+              >
+                <Search className="w-5 h-5 mr-2" />
+                Search Cars
+              </Button>
             </div>
           </div>
         </div>
