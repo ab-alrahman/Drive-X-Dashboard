@@ -11,6 +11,8 @@ import {
   Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { clearCustomerAuthTokens, clearAuthTokens } from "@/lib/api";
+import { useI18n } from "@/lib/i18n";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -23,6 +25,9 @@ export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
+  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
+  const [accountLabel, setAccountLabel] = useState("Customer");
+  const { language, setLanguage, t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -36,20 +41,31 @@ export default function Navbar() {
 
   useEffect(() => {
     const auth = localStorage.getItem("drive_x_auth");
-    setIsLoggedIn(!!auth);
+    const customer = localStorage.getItem("drive_x_customer");
+    setIsAdminLoggedIn(!!auth);
+    setIsLoggedIn(!!auth || !!customer);
+    if (auth) {
+      const parsed = JSON.parse(auth);
+      setAccountLabel(parsed.name ?? "Admin User");
+    } else if (customer) {
+      const parsed = JSON.parse(customer);
+      setAccountLabel(parsed.fullName ?? "Customer");
+    }
   }, [location]);
 
   const handleLogout = () => {
-    localStorage.removeItem("drive_x_auth");
+    clearAuthTokens();
+    clearCustomerAuthTokens();
     setIsLoggedIn(false);
+    setIsAdminLoggedIn(false);
     navigate("/");
   };
 
   const navLinks = [
-    { name: "Home", path: "/" },
-    { name: "Inventory", path: "/inventory" },
-    { name: "About", path: "/about" },
-    { name: "Contact", path: "/contact" },
+    { name: t("home"), path: "/" },
+    { name: t("inventory"), path: "/inventory" },
+    { name: t("about"), path: "/about" },
+    { name: t("contact"), path: "/contact" },
   ];
 
   const isActive = (path: string) => location.pathname === path;
@@ -105,9 +121,17 @@ export default function Navbar() {
                 className="text-white/70 hover:text-gold hover:bg-gold/10"
               >
                 <Search className="w-4 h-4 mr-2" />
-                Search
+                {t("search")}
               </Button>
             </Link>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => setLanguage(language === "en" ? "ar" : "en")}
+              className="text-white/70 hover:text-gold hover:bg-gold/10"
+            >
+              {language === "en" ? "العربية" : "English"}
+            </Button>
 
             {isLoggedIn ? (
               <DropdownMenu>
@@ -129,24 +153,26 @@ export default function Navbar() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">
-                        Admin User
+                        {accountLabel}
                       </p>
-                      <p className="text-xs text-gold">admin@drivex.com</p>
+                      <p className="text-xs text-gold">{isAdminLoggedIn ? t("admin") : t("customer")}</p>
                     </div>
                   </div>
-                  <DropdownMenuItem
-                    onClick={() => navigate("/dashboard")}
-                    className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
-                  >
-                    <LayoutDashboard className="mr-2 h-4 w-4" />
-                    Dashboard
-                  </DropdownMenuItem>
+                  {isAdminLoggedIn && (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/dashboard")}
+                      className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
+                    >
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      {t("dashboard")}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onClick={() => navigate("/inventory")}
                     className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
                   >
                     <Heart className="mr-2 h-4 w-4" />
-                    My Favorites
+                    {t("myFavorites")}
                   </DropdownMenuItem>
                   <DropdownMenuSeparator className="bg-gold/20" />
                   <DropdownMenuItem
@@ -154,7 +180,7 @@ export default function Navbar() {
                     className="text-red-400 hover:text-red-300 hover:bg-red-500/10 cursor-pointer"
                   >
                     <LogOut className="mr-2 h-4 w-4" />
-                    Logout
+                    {t("logout")}
                   </DropdownMenuItem>
                 </DropdownMenuContent>
               </DropdownMenu>
@@ -166,7 +192,7 @@ export default function Navbar() {
                     size="sm"
                     className="text-white/70 hover:text-gold hover:bg-gold/10"
                   >
-                    Sign In
+                    {t("signIn")}
                   </Button>
                 </Link>
                 <Link to="/register">
@@ -174,7 +200,7 @@ export default function Navbar() {
                     size="sm"
                     className="bg-gold hover:bg-gold-light text-dark font-semibold shadow-glow hover:shadow-glow-lg transition-all duration-300"
                   >
-                    Get Started
+                    {t("getStarted")}
                   </Button>
                 </Link>
               </div>
@@ -215,13 +241,15 @@ export default function Navbar() {
               <div className="border-t border-gold/20 pt-3 mt-2">
                 {isLoggedIn ? (
                   <>
-                    <Link
-                      to="/dashboard"
-                      onClick={() => setMobileMenuOpen(false)}
-                      className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
-                    >
-                      <LayoutDashboard className="w-4 h-4" /> Dashboard
-                    </Link>
+                    {isAdminLoggedIn && (
+                      <Link
+                        to="/dashboard"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
+                      >
+                      <LayoutDashboard className="w-4 h-4" /> {t("dashboard")}
+                      </Link>
+                    )}
                     <button
                       onClick={() => {
                         handleLogout();
@@ -229,7 +257,7 @@ export default function Navbar() {
                       }}
                       className="flex items-center gap-2 px-4 py-3 text-red-400 w-full"
                     >
-                      <LogOut className="w-4 h-4" /> Logout
+                      <LogOut className="w-4 h-4" /> {t("logout")}
                     </button>
                   </>
                 ) : (
@@ -239,7 +267,7 @@ export default function Navbar() {
                         variant="outline"
                         className="w-full border-gold/30 text-gold hover:bg-gold/10"
                       >
-                        Sign In
+                        {t("signIn")}
                       </Button>
                     </Link>
                     <Link
@@ -247,7 +275,7 @@ export default function Navbar() {
                       onClick={() => setMobileMenuOpen(false)}
                     >
                       <Button className="w-full bg-gold hover:bg-gold-light text-dark font-semibold">
-                        Get Started
+                        {t("getStarted")}
                       </Button>
                     </Link>
                   </div>

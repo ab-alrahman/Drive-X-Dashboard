@@ -9,9 +9,11 @@ import CarDetail from './pages/CarDetail'
 import Dashboard from './pages/Dashboard'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import { I18nProvider } from './lib/i18n'
 
 export default function App() {
   return (
+    <I18nProvider>
     <div className="min-h-screen bg-dark">
       <Navbar />
       <main>
@@ -28,5 +30,6 @@ export default function App() {
       </main>
       <Footer />
     </div>
+    </I18nProvider>
   )
 }

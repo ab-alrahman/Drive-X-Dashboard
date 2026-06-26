@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useParams, Link } from "react-router";
+import { useNavigate, useParams, Link } from "react-router";
 import {
   ChevronRight,
   Star,
@@ -22,8 +22,9 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { cars as fallbackCars } from "@/data/cars";
+import { getCustomerAccessToken } from "@/lib/api";
 import { mapApiCarToView, mapApiCarsToView, type CarView } from "@/lib/car-mapper";
-import { createLead, getPublicCar, getPublicCars } from "@/lib/public-api";
+import { addFavoriteCar, createLead, getFavoriteCars, getPublicCar, getPublicCars, removeFavoriteCar } from "@/lib/public-api";
 import {
   Dialog,
   DialogContent,
@@ -35,6 +36,7 @@ import { Textarea } from "@/components/ui/textarea";
 
 export default function CarDetail() {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [activeImage, setActiveImage] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showContact, setShowContact] = useState(false);
@@ -45,6 +47,7 @@ export default function CarDetail() {
   const [isLoading, setIsLoading] = useState(true);
   const [submitMessage, setSubmitMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
+  const [favoriteMessage, setFavoriteMessage] = useState("");
 
   useEffect(() => {
     if (!id) return;
@@ -74,6 +77,38 @@ export default function CarDetail() {
       });
   }, [id]);
 
+  useEffect(() => {
+    if (!id || !getCustomerAccessToken()) return;
+
+    getFavoriteCars()
+      .then((response) => setIsFavorite(response.ids.includes(id)))
+      .catch(() => undefined);
+  }, [id]);
+
+  const toggleFavorite = async () => {
+    if (!car) return;
+    if (!getCustomerAccessToken()) {
+      setFavoriteMessage("Create an account or sign in to save favorites.");
+      navigate("/register");
+      return;
+    }
+
+    const nextValue = !isFavorite;
+    setIsFavorite(nextValue);
+    setFavoriteMessage("");
+
+    try {
+      if (nextValue) {
+        await addFavoriteCar(car.id);
+      } else {
+        await removeFavoriteCar(car.id);
+      }
+    } catch (error) {
+      setIsFavorite(!nextValue);
+      setFavoriteMessage(error instanceof Error ? error.message : "Could not update favorites.");
+    }
+  };
+
   const handleLeadSubmit = async () => {
     if (!car) return;
     setSubmitMessage("");
@@ -89,6 +124,7 @@ export default function CarDetail() {
         fullName: contactForm.name,
         phone: contactForm.phone,
         email: contactForm.email || undefined,
+        city: car.city || undefined,
         message: contactForm.message || `Interested in ${car.brand} ${car.model}`,
         requestDelivery: false,
       });
@@ -198,7 +234,7 @@ export default function CarDetail() {
               </div>
               <div className="absolute top-4 right-4 flex gap-2">
                 <button
-                  onClick={() => setIsFavorite(!isFavorite)}
+                  onClick={toggleFavorite}
                   className="w-10 h-10 rounded-full bg-dark/60 backdrop-blur-sm flex items-center justify-center"
                 >
                   <Heart
@@ -250,6 +286,11 @@ export default function CarDetail() {
                 </div>
               </div>
             </div>
+            {favoriteMessage && (
+              <div className="mb-4 rounded-lg border border-gold/30 bg-gold/10 p-3 text-sm text-gold">
+                {favoriteMessage}
+              </div>
+            )}
 
             <div className="bg-dark-card border border-gold/20 rounded-xl p-6 mb-6">
               <div className="flex items-end justify-between mb-4">

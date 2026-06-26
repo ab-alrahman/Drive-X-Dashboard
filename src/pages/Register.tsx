@@ -4,8 +4,13 @@ import { Eye, EyeOff, UserPlus, Car, ArrowLeft, Mail, Lock, User, Phone } from "
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
+import { registerCustomer } from "@/lib/public-api";
+import { useNavigate } from "react-router";
+import { useI18n } from "@/lib/i18n";
 
 export default function Register() {
+  const navigate = useNavigate();
+  const { t } = useI18n();
   const [showPassword, setShowPassword] = useState(false);
   const [formData, setFormData] = useState({
     firstName: "",
@@ -36,11 +41,20 @@ export default function Register() {
       return;
     }
 
-    setIsLoading(true);
-    setTimeout(() => {
-      setError("Public registration is not available in the backend API yet. Please use admin login.");
+    try {
+      setIsLoading(true);
+      await registerCustomer({
+        fullName: `${formData.firstName} ${formData.lastName}`.trim(),
+        email: formData.email,
+        phone: formData.phone || undefined,
+        password: formData.password,
+      });
+      navigate("/inventory");
+    } catch (error) {
+      setError(error instanceof Error ? error.message : "Could not create your account");
+    } finally {
       setIsLoading(false);
-    }, 1500);
+    }
   };
 
   return (
@@ -65,12 +79,10 @@ export default function Register() {
 
           <div>
             <h2 className="text-4xl font-bold text-white mb-4">
-              Join the
-              <br />
-              <span className="text-gold">Elite</span>
+              {t("joinTitle")}
             </h2>
             <p className="text-white/60 text-lg max-w-md">
-              Create your account to unlock exclusive features: save favorites, schedule test drives, and get personalized recommendations.
+              {t("joinCopy")}
             </p>
           </div>
 
@@ -94,11 +106,11 @@ export default function Register() {
           </Link>
 
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-white mb-2">Create Account</h1>
+            <h1 className="text-3xl font-bold text-white mb-2">{t("createAccount")}</h1>
             <p className="text-white/60">
-              Already have an account?{" "}
+              {t("alreadyHaveAccount")}{" "}
               <Link to="/login" className="text-gold hover:text-gold-light font-medium">
-                Sign in
+                {t("signIn")}
               </Link>
             </p>
           </div>
@@ -112,7 +124,7 @@ export default function Register() {
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <label className="text-white/70 text-sm font-medium">First Name</label>
+                <label className="text-white/70 text-sm font-medium">{t("firstName")}</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                   <Input
@@ -125,7 +137,7 @@ export default function Register() {
                 </div>
               </div>
               <div className="space-y-2">
-                <label className="text-white/70 text-sm font-medium">Last Name</label>
+                <label className="text-white/70 text-sm font-medium">{t("lastName")}</label>
                 <div className="relative">
                   <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                   <Input
@@ -140,7 +152,7 @@ export default function Register() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Email Address</label>
+              <label className="text-white/70 text-sm font-medium">{t("emailAddress")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
@@ -155,7 +167,7 @@ export default function Register() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Phone Number</label>
+              <label className="text-white/70 text-sm font-medium">{t("phoneNumber")}</label>
               <div className="relative">
                 <Phone className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
@@ -170,7 +182,7 @@ export default function Register() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Password</label>
+              <label className="text-white/70 text-sm font-medium">{t("password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
@@ -192,7 +204,7 @@ export default function Register() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Confirm Password</label>
+              <label className="text-white/70 text-sm font-medium">{t("confirmPassword")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
@@ -214,10 +226,7 @@ export default function Register() {
                 className="mt-1 border-gold/30 data-[state=checked]:bg-gold data-[state=checked]:text-dark"
               />
               <label htmlFor="terms" className="text-white/60 text-sm cursor-pointer">
-                I agree to the{" "}
-                <span className="text-gold hover:text-gold-light">Terms of Service</span>
-                {" "}and{" "}
-                <span className="text-gold hover:text-gold-light">Privacy Policy</span>
+                {t("terms")}
               </label>
             </div>
 
@@ -231,7 +240,7 @@ export default function Register() {
               ) : (
                 <>
                   <UserPlus className="w-5 h-5 mr-2" />
-                  Create Account
+                  {t("createAccount")}
                 </>
               )}
             </Button>

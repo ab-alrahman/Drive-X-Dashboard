@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Link, useSearchParams } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import {
   Search,
   SlidersHorizontal,
@@ -28,20 +28,47 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cars as fallbackCars, categories, brands, fuelTypes } from "@/data/cars";
+import { cars as fallbackCars } from "@/data/cars";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
-import { getPublicCars } from "@/lib/public-api";
+import { getCustomerAccessToken } from "@/lib/api";
+import {
+  addFavoriteCar,
+  getFavoriteCars,
+  getFiltersMeta,
+  getPublicCars,
+  removeFavoriteCar,
+} from "@/lib/public-api";
+import { useI18n } from "@/lib/i18n";
+
+const listingTypes = [
+  { label: "All", value: "All" },
+  { label: "For Sale", value: "SALE" },
+  { label: "For Rent", value: "RENT" },
+  { label: "Sale & Rent", value: "BOTH" },
+];
+
+const sortOptions = [
+  { label: "Newest First", value: "newest" },
+  { label: "Price: Low to High", value: "price_asc" },
+  { label: "Price: High to Low", value: "price_desc" },
+  { label: "Year: Newest", value: "year_desc" },
+  { label: "Mileage: Low to High", value: "mileage_asc" },
+];
 
 export default function Inventory() {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") ?? "");
   const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") ?? "All");
   const [selectedBrand, setSelectedBrand] = useState(searchParams.get("brand") ?? "All");
   const [selectedFuel, setSelectedFuel] = useState("All");
   const [priceRange, setPriceRange] = useState(searchParams.get("priceRange") ?? "All");
-  const [sortBy, setSortBy] = useState("featured");
+  const [sortBy, setSortBy] = useState("newest");
   const [viewMode, setViewMode] = useState<"grid" | "list">("grid");
   const [favorites, setFavorites] = useState<string[]>([]);
+  const [filterBrands, setFilterBrands] = useState<string[]>(["All"]);
+  const [filterFuels, setFilterFuels] = useState<string[]>(["All"]);
   const [selectedCar, setSelectedCar] = useState<CarView | null>(null);
   const [showFilters, setShowFilters] = useState(false);
   const [inventoryCars, setInventoryCars] = useState<CarView[]>(
@@ -49,62 +76,82 @@ export default function Inventory() {
   );
   const [isLoadingCars, setIsLoadingCars] = useState(true);
   const [carsError, setCarsError] = useState("");
+  const [favoriteMessage, setFavoriteMessage] = useState("");
 
   useEffect(() => {
-    getPublicCars({ page: 1, limit: 50, sortBy: "newest" })
+    getFiltersMeta()
       .then((response) => {
-        const cars = mapApiCarsToView(response.items);
-        if (cars.length > 0) {
-          setInventoryCars(cars);
-        }
-        setCarsError("");
+        setFilterBrands(["All", ...(response.brands ?? [])]);
+        setFilterFuels(["All", ...(response.fuelTypes ?? [])]);
       })
-      .catch((error: Error) => {
-        setCarsError(error.message || "Could not load live inventory. Showing sample vehicles.");
-      })
-      .finally(() => setIsLoadingCars(false));
+      .catch(() => undefined);
   }, []);
 
-  const toggleFavorite = (id: string) => {
-    setFavorites((prev) =>
-      prev.includes(id) ? prev.filter((f) => f !== id) : [...prev, id]
-    );
+  useEffect(() => {
+    if (!getCustomerAccessToken()) return;
+
+    getFavoriteCars()
+      .then((response) => setFavorites(response.ids))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    const priceFilters: Record<string, { priceMin?: number; priceMax?: number }> = {
+      under100: { priceMax: 100000 },
+      "100to200": { priceMin: 100000, priceMax: 200000 },
+      "200to500": { priceMin: 200000, priceMax: 500000 },
+      over500: { priceMin: 500000 },
+    };
+    const timer = window.setTimeout(() => {
+      setIsLoadingCars(true);
+      getPublicCars({
+        page: 1,
+        limit: 50,
+        search: searchQuery || undefined,
+        brand: selectedBrand !== "All" ? selectedBrand : undefined,
+        listingType: selectedCategory !== "All" ? selectedCategory : undefined,
+        fuelType: selectedFuel !== "All" ? selectedFuel : undefined,
+        sortBy,
+        ...priceFilters[priceRange],
+      })
+        .then((response) => {
+          const cars = mapApiCarsToView(response.items);
+          setInventoryCars(cars);
+          setCarsError("");
+        })
+        .catch((error: Error) => {
+          setCarsError(error.message || "Could not load live inventory. Showing sample vehicles.");
+        })
+        .finally(() => setIsLoadingCars(false));
+    }, 250);
+
+    return () => window.clearTimeout(timer);
+  }, [searchQuery, selectedCategory, selectedBrand, selectedFuel, priceRange, sortBy]);
+
+  const toggleFavorite = async (id: string) => {
+    if (!getCustomerAccessToken()) {
+      setFavoriteMessage("Create an account or sign in to save favorites.");
+      navigate("/register");
+      return;
+    }
+
+    const wasFavorite = favorites.includes(id);
+    setFavorites((prev) => (wasFavorite ? prev.filter((favoriteId) => favoriteId !== id) : [...prev, id]));
+    setFavoriteMessage("");
+
+    try {
+      if (wasFavorite) {
+        await removeFavoriteCar(id);
+      } else {
+        await addFavoriteCar(id);
+      }
+    } catch (error) {
+      setFavorites((prev) => (wasFavorite ? [...prev, id] : prev.filter((favoriteId) => favoriteId !== id)));
+      setFavoriteMessage(error instanceof Error ? error.message : "Could not update favorites.");
+    }
   };
 
-  const filteredCars = inventoryCars.filter((car) => {
-    const matchesSearch =
-      !searchQuery ||
-      car.brand.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      car.model.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      car.category.toLowerCase().includes(searchQuery.toLowerCase());
-    const matchesCategory =
-      selectedCategory === "All" || car.category === selectedCategory;
-    const matchesBrand =
-      selectedBrand === "All" || car.brand === selectedBrand;
-    const matchesFuel = selectedFuel === "All" || car.fuelType === selectedFuel;
-    const matchesPrice =
-      priceRange === "All" ||
-      (priceRange === "under100" && car.price < 100000) ||
-      (priceRange === "100to200" && car.price >= 100000 && car.price < 200000) ||
-      (priceRange === "200to500" && car.price >= 200000 && car.price < 500000) ||
-      (priceRange === "over500" && car.price >= 500000);
-    return matchesSearch && matchesCategory && matchesBrand && matchesFuel && matchesPrice;
-  });
-
-  const sortedCars = [...filteredCars].sort((a, b) => {
-    switch (sortBy) {
-      case "price-low":
-        return a.price - b.price;
-      case "price-high":
-        return b.price - a.price;
-      case "year-new":
-        return b.year - a.year;
-      case "name":
-        return `${a.brand} ${a.model}`.localeCompare(`${b.brand} ${b.model}`);
-      default:
-        return (b.featured ? 1 : 0) - (a.featured ? 1 : 0);
-    }
-  });
+  const sortedCars = inventoryCars;
 
   const activeFiltersCount = [
     selectedCategory !== "All",
@@ -121,16 +168,16 @@ export default function Inventory() {
           <div className="flex items-center gap-3 mb-3">
             <div className="h-px w-12 bg-gold" />
             <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-              Premium Collection
+              {t("premiumCollection")}
             </span>
           </div>
           <div className="flex flex-col md:flex-row md:items-end justify-between gap-4">
             <div>
               <h1 className="text-3xl md:text-4xl font-bold text-white">
-                Our Inventory
+                {t("ourInventory")}
               </h1>
               <p className="text-white/60 mt-2">
-                {isLoadingCars ? "Loading inventory..." : `${sortedCars.length} vehicles available`}
+                {isLoadingCars ? t("loadingInventory") : `${sortedCars.length} ${t("vehiclesAvailable")}`}
               </p>
             </div>
             <div className="flex items-center gap-3">
@@ -162,7 +209,7 @@ export default function Inventory() {
                 className="border-gold/30 text-gold hover:bg-gold/10"
               >
                 <SlidersHorizontal className="w-4 h-4 mr-2" />
-                Filters
+                {t("filters")}
                 {activeFiltersCount > 0 && (
                   <span className="ml-2 bg-gold text-dark text-xs font-bold w-5 h-5 rounded-full flex items-center justify-center">
                     {activeFiltersCount}
@@ -178,6 +225,11 @@ export default function Inventory() {
             {carsError}
           </div>
         )}
+        {favoriteMessage && (
+          <div className="mb-6 rounded-lg border border-gold/30 bg-gold/10 px-4 py-3 text-sm text-gold">
+            {favoriteMessage}
+          </div>
+        )}
 
         {/* Search Bar */}
         <div className="bg-dark-card border border-gold/20 rounded-xl p-4 mb-6">
@@ -185,7 +237,7 @@ export default function Inventory() {
             <div className="relative flex-1">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
               <Input
-                placeholder="Search by brand, model, or keyword..."
+                placeholder={t("search")}
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="pl-10 bg-dark border-gold/20 text-white placeholder:text-white/30 focus:border-gold"
@@ -197,11 +249,11 @@ export default function Inventory() {
                 <SelectValue />
               </SelectTrigger>
               <SelectContent className="bg-dark-card border-gold/20">
-                <SelectItem value="featured">Featured First</SelectItem>
-                <SelectItem value="price-low">Price: Low to High</SelectItem>
-                <SelectItem value="price-high">Price: High to Low</SelectItem>
-                <SelectItem value="year-new">Newest First</SelectItem>
-                <SelectItem value="name">Name A-Z</SelectItem>
+                {sortOptions.map((option) => (
+                  <SelectItem key={option.value} value={option.value}>
+                    {option.label}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
           </div>
@@ -211,7 +263,7 @@ export default function Inventory() {
         {showFilters && (
           <div className="bg-dark-card border border-gold/20 rounded-xl p-6 mb-6 animate-fade-in-up">
             <div className="flex items-center justify-between mb-4">
-              <h3 className="text-white font-semibold">Advanced Filters</h3>
+              <h3 className="text-white font-semibold">{t("advancedFilters")}</h3>
               <button
                 onClick={() => {
                   setSelectedCategory("All");
@@ -221,57 +273,57 @@ export default function Inventory() {
                 }}
                 className="text-gold hover:text-gold-light text-sm"
               >
-                Clear All
+                {t("clearAll")}
               </button>
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
               <div>
-                <label className="text-white/60 text-sm mb-2 block">Category</label>
+                <label className="text-white/60 text-sm mb-2 block">{t("listingType")}</label>
                 <Select value={selectedCategory} onValueChange={setSelectedCategory}>
                   <SelectTrigger className="bg-dark border-gold/20 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
-                    {categories.map((c) => (
-                      <SelectItem key={c} value={c}>{c}</SelectItem>
+                    {listingTypes.map((c) => (
+                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-white/60 text-sm mb-2 block">Brand</label>
+                <label className="text-white/60 text-sm mb-2 block">{t("brand")}</label>
                 <Select value={selectedBrand} onValueChange={setSelectedBrand}>
                   <SelectTrigger className="bg-dark border-gold/20 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
-                    {brands.map((b) => (
+                    {filterBrands.map((b) => (
                       <SelectItem key={b} value={b}>{b}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-white/60 text-sm mb-2 block">Fuel Type</label>
+                <label className="text-white/60 text-sm mb-2 block">{t("fuelType")}</label>
                 <Select value={selectedFuel} onValueChange={setSelectedFuel}>
                   <SelectTrigger className="bg-dark border-gold/20 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
-                    {fuelTypes.map((f) => (
+                    {filterFuels.map((f) => (
                       <SelectItem key={f} value={f}>{f}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
               <div>
-                <label className="text-white/60 text-sm mb-2 block">Price Range</label>
+                <label className="text-white/60 text-sm mb-2 block">{t("priceRange")}</label>
                 <Select value={priceRange} onValueChange={setPriceRange}>
                   <SelectTrigger className="bg-dark border-gold/20 text-white">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
-                    <SelectItem value="All">Any Price</SelectItem>
+                    <SelectItem value="All">{t("anyPrice")}</SelectItem>
                     <SelectItem value="under100">Under $100,000</SelectItem>
                     <SelectItem value="100to200">$100k - $200k</SelectItem>
                     <SelectItem value="200to500">$200k - $500k</SelectItem>
@@ -500,8 +552,8 @@ export default function Inventory() {
         {sortedCars.length === 0 && (
           <div className="text-center py-20">
             <Search className="w-16 h-16 text-gold/20 mx-auto mb-4" />
-            <h3 className="text-white text-xl font-bold mb-2">No cars found</h3>
-            <p className="text-white/60 mb-6">Try adjusting your filters or search query</p>
+            <h3 className="text-white text-xl font-bold mb-2">{t("noCarsFound")}</h3>
+            <p className="text-white/60 mb-6">{t("adjustFilters")}</p>
             <Button
               onClick={() => {
                 setSearchQuery("");
@@ -513,7 +565,7 @@ export default function Inventory() {
               variant="outline"
               className="border-gold/30 text-gold hover:bg-gold/10"
             >
-              Clear All Filters
+              {t("clearAll")}
             </Button>
           </div>
         )}

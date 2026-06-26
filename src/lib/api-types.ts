@@ -132,6 +132,17 @@ export interface AuthTokenResponse {
   expiresIn: number;
 }
 
+export interface CustomerProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  phone?: string | null;
+}
+
+export interface CustomerAuthResponse extends AuthTokenResponse {
+  customer: CustomerProfile;
+}
+
 export interface DashboardSummaryResponse {
   totalCars: number;
   availableCars: number;
@@ -139,6 +150,26 @@ export interface DashboardSummaryResponse {
   closedDeals: number;
   monthlyCommission: Money;
   conversionRate: number;
+  recentLeads?: Array<{
+    id: string;
+    carId: string;
+    intent: LeadIntent;
+    status: LeadStatus;
+    fullName: string;
+    phone: string;
+    createdAt: string;
+  }>;
+  recentCars?: Array<{
+    id: string;
+    brand: string;
+    model: string;
+    year: number;
+    status: CarStatus;
+    createdAt: string;
+  }>;
+  leadsByStatus?: Partial<Record<LeadStatus, number>>;
+  dealsThisMonth?: number;
+  commissionByMonth?: Array<Money & { month: string }>;
 }
 
 export interface DealResponse {
@@ -152,4 +183,14 @@ export interface DealResponse {
   commission: Money;
   notes?: string;
   createdAt: string;
+}
+
+export interface CreateDealRequest {
+  leadId: string;
+  carId: string;
+  type: "SALE" | "RENT";
+  finalPrice: Money;
+  commissionType: "PERCENTAGE" | "FIXED";
+  commissionValue: number;
+  notes?: string;
 }
