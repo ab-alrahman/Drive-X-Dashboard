@@ -28,7 +28,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog";
-import { cars as fallbackCars } from "@/data/cars";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
 import { getCustomerAccessToken } from "@/lib/api";
 import {
@@ -41,18 +40,25 @@ import {
 import { useI18n } from "@/lib/i18n";
 
 const listingTypes = [
-  { label: "All", value: "All" },
-  { label: "For Sale", value: "SALE" },
-  { label: "For Rent", value: "RENT" },
-  { label: "Sale & Rent", value: "BOTH" },
+  { labelKey: "all" as const, value: "All" },
+  { labelKey: "forSale" as const, value: "SALE" },
+  { labelKey: "forRent" as const, value: "RENT" },
+  { labelKey: "saleAndRent" as const, value: "BOTH" },
 ];
 
 const sortOptions = [
-  { label: "Newest First", value: "newest" },
-  { label: "Price: Low to High", value: "price_asc" },
-  { label: "Price: High to Low", value: "price_desc" },
-  { label: "Year: Newest", value: "year_desc" },
-  { label: "Mileage: Low to High", value: "mileage_asc" },
+  { labelKey: "newestFirst" as const, value: "newest" },
+  { labelKey: "priceLowToHigh" as const, value: "price_asc" },
+  { labelKey: "priceHighToLow" as const, value: "price_desc" },
+  { labelKey: "yearNewest" as const, value: "year_desc" },
+  { labelKey: "mileageLowToHigh" as const, value: "mileage_asc" },
+];
+
+const priceFilterOptions = [
+  { labelKey: "under100000" as const, value: "under100" },
+  { labelKey: "range100to200" as const, value: "100to200" },
+  { labelKey: "range200to500" as const, value: "200to500" },
+  { labelKey: "above500k" as const, value: "over500" },
 ];
 
 export default function Inventory() {
@@ -71,9 +77,7 @@ export default function Inventory() {
   const [filterFuels, setFilterFuels] = useState<string[]>(["All"]);
   const [selectedCar, setSelectedCar] = useState<CarView | null>(null);
   const [showFilters, setShowFilters] = useState(false);
-  const [inventoryCars, setInventoryCars] = useState<CarView[]>(
-    fallbackCars.map((car) => ({ ...car, id: String(car.id), listingType: "SALE" as const, city: undefined }))
-  );
+  const [inventoryCars, setInventoryCars] = useState<CarView[]>([]);
   const [isLoadingCars, setIsLoadingCars] = useState(true);
   const [carsError, setCarsError] = useState("");
   const [favoriteMessage, setFavoriteMessage] = useState("");
@@ -97,10 +101,10 @@ export default function Inventory() {
 
   useEffect(() => {
     const priceFilters: Record<string, { priceMin?: number; priceMax?: number }> = {
-      under100: { priceMax: 100000 },
-      "100to200": { priceMin: 100000, priceMax: 200000 },
-      "200to500": { priceMin: 200000, priceMax: 500000 },
-      over500: { priceMin: 500000 },
+      under100: { priceMax: 20000 },
+      "100to200": { priceMin: 20000, priceMax: 30000 },
+      "200to500": { priceMin: 30000, priceMax: 40000 },
+      over500: { priceMin: 40000 },
     };
     const timer = window.setTimeout(() => {
       setIsLoadingCars(true);
@@ -120,7 +124,8 @@ export default function Inventory() {
           setCarsError("");
         })
         .catch((error: Error) => {
-          setCarsError(error.message || "Could not load live inventory. Showing sample vehicles.");
+          setInventoryCars([]);
+          setCarsError(error.message || "Could not load inventory right now.");
         })
         .finally(() => setIsLoadingCars(false));
     }, 250);
@@ -130,7 +135,7 @@ export default function Inventory() {
 
   const toggleFavorite = async (id: string) => {
     if (!getCustomerAccessToken()) {
-      setFavoriteMessage("Create an account or sign in to save favorites.");
+      setFavoriteMessage(t("createAccountOrSignIn"));
       navigate("/register");
       return;
     }
@@ -147,7 +152,7 @@ export default function Inventory() {
       }
     } catch (error) {
       setFavorites((prev) => (wasFavorite ? [...prev, id] : prev.filter((favoriteId) => favoriteId !== id)));
-      setFavoriteMessage(error instanceof Error ? error.message : "Could not update favorites.");
+      setFavoriteMessage(error instanceof Error ? error.message : t("couldNotUpdateFavorites"));
     }
   };
 
@@ -251,7 +256,7 @@ export default function Inventory() {
               <SelectContent className="bg-dark-card border-gold/20">
                 {sortOptions.map((option) => (
                   <SelectItem key={option.value} value={option.value}>
-                    {option.label}
+                    {t(option.labelKey)}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -285,7 +290,7 @@ export default function Inventory() {
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
                     {listingTypes.map((c) => (
-                      <SelectItem key={c.value} value={c.value}>{c.label}</SelectItem>
+                      <SelectItem key={c.value} value={c.value}>{t(c.labelKey)}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -298,7 +303,7 @@ export default function Inventory() {
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
                     {filterBrands.map((b) => (
-                      <SelectItem key={b} value={b}>{b}</SelectItem>
+                      <SelectItem key={b} value={b}>{b === "All" ? t("all") : b}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -311,7 +316,7 @@ export default function Inventory() {
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
                     {filterFuels.map((f) => (
-                      <SelectItem key={f} value={f}>{f}</SelectItem>
+                      <SelectItem key={f} value={f}>{f === "All" ? t("all") : f}</SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
@@ -324,10 +329,9 @@ export default function Inventory() {
                   </SelectTrigger>
                   <SelectContent className="bg-dark-card border-gold/20">
                     <SelectItem value="All">{t("anyPrice")}</SelectItem>
-                    <SelectItem value="under100">Under $100,000</SelectItem>
-                    <SelectItem value="100to200">$100k - $200k</SelectItem>
-                    <SelectItem value="200to500">$200k - $500k</SelectItem>
-                    <SelectItem value="over500">Above $500k</SelectItem>
+                    {priceFilterOptions.map((opt) => (
+                      <SelectItem key={opt.value} value={opt.value}>{t(opt.labelKey)}</SelectItem>
+                    ))}
                   </SelectContent>
                 </Select>
               </div>
@@ -340,7 +344,7 @@ export default function Inventory() {
           <div className="flex flex-wrap gap-2 mb-6">
             {selectedCategory !== "All" && (
               <span className="bg-gold/10 border border-gold/30 text-gold text-sm px-3 py-1 rounded-full flex items-center gap-2">
-                {selectedCategory}
+                {listingTypes.find((lt) => lt.value === selectedCategory) ? t(listingTypes.find((lt) => lt.value === selectedCategory)!.labelKey) : selectedCategory}
                 <button onClick={() => setSelectedCategory("All")}><X className="w-3 h-3" /></button>
               </span>
             )}
@@ -358,10 +362,7 @@ export default function Inventory() {
             )}
             {priceRange !== "All" && (
               <span className="bg-gold/10 border border-gold/30 text-gold text-sm px-3 py-1 rounded-full flex items-center gap-2">
-                {priceRange === "under100" && "Under $100k"}
-                {priceRange === "100to200" && "$100k - $200k"}
-                {priceRange === "200to500" && "$200k - $500k"}
-                {priceRange === "over500" && "Above $500k"}
+                {t(priceFilterOptions.find((po) => po.value === priceRange)?.labelKey ?? "anyPrice")}
                 <button onClick={() => setPriceRange("All")}><X className="w-3 h-3" /></button>
               </span>
             )}
@@ -403,7 +404,7 @@ export default function Inventory() {
                   {car.status === "reserved" && (
                     <div className="absolute bottom-3 left-3">
                       <span className="bg-orange-500/80 text-white text-xs font-bold px-3 py-1 rounded-full">
-                        Reserved
+                        {t("reserved")}
                       </span>
                     </div>
                   )}
@@ -438,14 +439,14 @@ export default function Inventory() {
                         onClick={() => setSelectedCar(car)}
                         className="text-gold hover:text-gold-light hover:bg-gold/10"
                       >
-                        Details
+                        {t("details")}
                       </Button>
                       <Link to={`/car/${car.id}`}>
                         <Button
                           size="sm"
                           className="bg-gold hover:bg-gold-light text-dark"
                         >
-                          View
+                          {t("view")}
                           <ChevronRight className="w-4 h-4 ml-1" />
                         </Button>
                       </Link>
@@ -511,7 +512,7 @@ export default function Inventory() {
                           </span>
                         ))}
                         {car.features.length > 3 && (
-                          <span className="text-white/40 text-xs">+{car.features.length - 3} more</span>
+                          <span className="text-white/40 text-xs">+{car.features.length - 3}</span>
                         )}
                       </div>
                     </div>
@@ -532,11 +533,11 @@ export default function Inventory() {
                           onClick={() => setSelectedCar(car)}
                           className="text-gold hover:bg-gold/10"
                         >
-                          Details
+                          {t("details")}
                         </Button>
                         <Link to={`/car/${car.id}`}>
                           <Button className="bg-gold hover:bg-gold-light text-dark">
-                            View Car
+                            {t("viewCar")}
                             <ChevronRight className="w-4 h-4 ml-1" />
                           </Button>
                         </Link>
@@ -588,25 +589,25 @@ export default function Inventory() {
               />
               <div className="grid grid-cols-2 gap-4 text-sm">
                 <div className="bg-dark p-3 rounded-lg">
-                  <span className="text-white/50">Year</span>
+                  <span className="text-white/50">{t("year")}</span>
                   <p className="text-white font-semibold">{selectedCar.year}</p>
                 </div>
                 <div className="bg-dark p-3 rounded-lg">
-                  <span className="text-white/50">Engine</span>
+                  <span className="text-white/50">{t("engine")}</span>
                   <p className="text-white font-semibold">{selectedCar.engine}</p>
                 </div>
                 <div className="bg-dark p-3 rounded-lg">
-                  <span className="text-white/50">Power</span>
+                  <span className="text-white/50">{t("power")}</span>
                   <p className="text-white font-semibold">{selectedCar.power}</p>
                 </div>
                 <div className="bg-dark p-3 rounded-lg">
-                  <span className="text-white/50">0-100 km/h</span>
+                  <span className="text-white/50">{t("acceleration")}</span>
                   <p className="text-white font-semibold">{selectedCar.acceleration}</p>
                 </div>
               </div>
               <Link to={`/car/${selectedCar.id}`}>
                 <Button className="w-full bg-gold hover:bg-gold-light text-dark font-bold">
-                  View Full Details
+                  {t("viewFullDetails")}
                   <ChevronRight className="w-4 h-4 ml-2" />
                 </Button>
               </Link>

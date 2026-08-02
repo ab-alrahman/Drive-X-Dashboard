@@ -14,28 +14,50 @@ import {
   Fuel,
   Users,
   Award,
-  Crown,
   Search,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cars as fallbackCars, testimonials, stats, categories, brands } from "@/data/cars";
+import { testimonials, stats } from "@/data/cars";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
-import { getPublicCars } from "@/lib/public-api";
+import { getFiltersMeta, getPublicCars } from "@/lib/public-api";
+import { useI18n } from "@/lib/i18n";
+
+const listingTypeOptions = [
+  { value: "All", labelKey: "all" as const },
+  { value: "SALE", labelKey: "forSale" as const },
+  { value: "RENT", labelKey: "forRent" as const },
+  { value: "BOTH", labelKey: "saleAndRent" as const },
+];
 
 export default function Home() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [heroLoaded, setHeroLoaded] = useState(false);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [quickSearch, setQuickSearch] = useState({ category: "All", brand: "All", priceRange: "All" });
-  const [featuredCars, setFeaturedCars] = useState<CarView[]>(
-    fallbackCars
-      .filter((c) => c.featured)
-      .slice(0, 4)
-      .map((car) => ({ ...car, id: String(car.id), listingType: "SALE" as const, city: undefined }))
-  );
+  const [featuredCars, setFeaturedCars] = useState<CarView[]>([]);
+  const [featuredCarsLoading, setFeaturedCarsLoading] = useState(true);
+  const [filterBrands, setFilterBrands] = useState<string[]>(["All"]);
+  const [listingTypeCounts, setListingTypeCounts] = useState<Record<string, number>>({});
 
   useEffect(() => {
     setHeroLoaded(true);
+  }, []);
+
+  useEffect(() => {
+    getFiltersMeta()
+      .then((response) => setFilterBrands(["All", ...(response.brands ?? [])]))
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    Promise.all(
+      ["SALE", "RENT", "BOTH"].map((listingType) =>
+        getPublicCars({ listingType, limit: 1 }).then((response) => [listingType, response.total] as const)
+      )
+    )
+      .then((entries) => setListingTypeCounts(Object.fromEntries(entries)))
+      .catch(() => undefined);
   }, []);
 
   const handleQuickSearch = () => {
@@ -49,13 +71,18 @@ export default function Home() {
   useEffect(() => {
     getPublicCars({ page: 1, limit: 4, sortBy: "newest" })
       .then((response) => {
-        const cars = mapApiCarsToView(response.items);
-        if (cars.length > 0) {
-          setFeaturedCars(cars);
-        }
+        setFeaturedCars(mapApiCarsToView(response.items));
       })
-      .catch(() => undefined);
+      .catch(() => setFeaturedCars([]))
+      .finally(() => setFeaturedCarsLoading(false));
   }, []);
+
+  const whyChooseItems = [
+    { icon: Shield, titleKey: "verifiedQuality" as const, descKey: "verifiedQualityDesc" as const },
+    { icon: Clock, titleKey: "fastProcess" as const, descKey: "fastProcessDesc" as const },
+    { icon: Wrench, titleKey: "premiumWarranty" as const, descKey: "premiumWarrantyDesc" as const },
+    { icon: Zap, titleKey: "bestPrices" as const, descKey: "bestPricesDesc" as const },
+  ];
 
   return (
     <div className="min-h-screen bg-dark">
@@ -78,18 +105,18 @@ export default function Home() {
             <div className="flex items-center gap-3 mb-6">
               <div className="h-px w-12 bg-gold" />
               <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-                Premium Car Marketplace
+                {t("premiumCarMarketplace")}
               </span>
             </div>
 
             <h1 className="text-5xl md:text-7xl lg:text-8xl font-bold text-white leading-[1.1] mb-6">
-              Drive Your
+              {t("driveYourDreams")}
               <br />
-              <span className="text-gold text-shadow-glow">Dreams</span>
+              <span className="text-gold text-shadow-glow">{t("driveYourDreamsHighlight")}</span>
             </h1>
 
             <p className="text-lg md:text-xl text-white/70 mb-8 max-w-xl leading-relaxed">
-              Discover premium vehicles for sale and rent. From daily-ready sedans to rare performance cars, find your perfect match with Drive X.
+              {t("heroSubtitle")}
             </p>
 
             <div className="flex flex-col sm:flex-row gap-4">
@@ -98,7 +125,7 @@ export default function Home() {
                   size="lg"
                   className="bg-gold hover:bg-gold-light text-dark font-bold text-base px-8 py-6 shadow-glow hover:shadow-glow-lg transition-all duration-300 group"
                 >
-                  Explore Inventory
+                  {t("exploreInventory")}
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
@@ -108,7 +135,7 @@ export default function Home() {
                   size="lg"
                   className="border-gold/50 text-gold hover:bg-gold/10 font-semibold text-base px-8 py-6"
                 >
-                  Sell Your Car
+                  {t("sellYourCar")}
                 </Button>
               </Link>
             </div>
@@ -117,7 +144,7 @@ export default function Home() {
 
         {/* Scroll indicator */}
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce">
-          <span className="text-white/40 text-xs tracking-wider">SCROLL</span>
+          <span className="text-white/40 text-xs tracking-wider">{t("scrollLabel")}</span>
           <div className="w-px h-8 bg-gradient-to-b from-gold to-transparent" />
         </div>
       </section>
@@ -140,53 +167,53 @@ export default function Home() {
       <section className="py-20 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-12">
           <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-            Find Your Perfect Car
+            {t("findYourPerfectCar")}
           </span>
           <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
-            Quick Search
+            {t("quickSearch")}
           </h2>
         </div>
 
         <div className="bg-dark-card border border-gold/20 rounded-2xl p-6 md:p-8 shadow-xl">
           <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
             <div className="space-y-2">
-              <label className="text-white/60 text-sm">Category</label>
+              <label className="text-white/60 text-sm">{t("listingType")}</label>
               <select
                 value={quickSearch.category}
                 onChange={(event) => setQuickSearch({ ...quickSearch, category: event.target.value })}
                 className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold"
               >
-                {categories.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                {listingTypeOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {t(option.labelKey)}
                   </option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-white/60 text-sm">Brand</label>
+              <label className="text-white/60 text-sm">{t("brand")}</label>
               <select
                 value={quickSearch.brand}
                 onChange={(event) => setQuickSearch({ ...quickSearch, brand: event.target.value })}
                 className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold"
               >
-                {brands.map((brand) => (
-                  <option key={brand} value={brand}>{brand === "All" ? "All Brands" : brand}</option>
+                {filterBrands.map((brand) => (
+                  <option key={brand} value={brand}>{brand === "All" ? t("allBrands") : brand}</option>
                 ))}
               </select>
             </div>
             <div className="space-y-2">
-              <label className="text-white/60 text-sm">Price Range</label>
+              <label className="text-white/60 text-sm">{t("priceRange")}</label>
               <select
                 value={quickSearch.priceRange}
                 onChange={(event) => setQuickSearch({ ...quickSearch, priceRange: event.target.value })}
                 className="w-full bg-dark border border-gold/30 rounded-lg px-4 py-3 text-white focus:outline-none focus:border-gold"
               >
-                <option value="All">Any Price</option>
-                <option value="under100">Under $100k</option>
-                <option value="100to200">$100k - $200k</option>
-                <option value="200to500">$200k - $500k</option>
-                <option value="over500">Above $500k</option>
+                <option value="All">{t("anyPrice")}</option>
+                <option value="under100">{t("under100k")}</option>
+                <option value="100to200">{t("range100to200")}</option>
+                <option value="200to500">{t("range200to500")}</option>
+                <option value="over500">{t("above500k")}</option>
               </select>
             </div>
             <div className="flex items-end">
@@ -195,7 +222,7 @@ export default function Home() {
                 className="w-full bg-gold hover:bg-gold-light text-dark font-bold py-6 shadow-glow hover:shadow-glow-lg transition-all"
               >
                 <Search className="w-5 h-5 mr-2" />
-                Search Cars
+                {t("searchCars")}
               </Button>
             </div>
           </div>
@@ -208,10 +235,10 @@ export default function Home() {
           <div className="flex flex-col md:flex-row md:items-end justify-between mb-12 gap-4">
             <div>
               <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-                Curated Selection
+                {t("curatedSelection")}
               </span>
               <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
-                Featured Vehicles
+                {t("featuredVehicles")}
               </h2>
             </div>
             <Link to="/inventory">
@@ -219,12 +246,21 @@ export default function Home() {
                 variant="ghost"
                 className="text-gold hover:text-gold-light hover:bg-gold/10 group"
               >
-                View All Inventory
+                {t("viewAllInventory")}
                 <ChevronRight className="w-4 h-4 ml-2 group-hover:translate-x-1 transition-transform" />
               </Button>
             </Link>
           </div>
 
+          {featuredCarsLoading ? (
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+              {Array.from({ length: 4 }).map((_, i) => (
+                <div key={i} className="h-72 rounded-xl bg-dark-card border border-gold/10 animate-pulse" />
+              ))}
+            </div>
+          ) : featuredCars.length === 0 ? (
+            <div className="text-center py-12 text-white/50">{t("noCarsFound")}</div>
+          ) : (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
             {featuredCars.map((car) => (
               <Link
@@ -247,7 +283,7 @@ export default function Home() {
                   {car.originalPrice && (
                     <div className="absolute top-3 right-3">
                       <span className="bg-red-500/80 text-white text-xs font-bold px-3 py-1 rounded-full">
-                        Sale
+                        {t("sale")}
                       </span>
                     </div>
                   )}
@@ -296,6 +332,7 @@ export default function Home() {
               </Link>
             ))}
           </div>
+          )}
         </div>
       </section>
 
@@ -310,36 +347,15 @@ export default function Home() {
         <div className="relative z-10 max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
             <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-              Our Advantages
+              {t("ourAdvantages")}
             </span>
             <h2 className="text-3xl md:text-5xl font-bold text-white mt-3">
-              Why Choose Drive X
+              {t("whyChooseDriveX")}
             </h2>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-8">
-            {[
-              {
-                icon: Shield,
-                title: "Verified Quality",
-                desc: "Every vehicle undergoes rigorous 200-point inspection before listing.",
-              },
-              {
-                icon: Clock,
-                title: "Fast Process",
-                desc: "Complete your purchase in as little as 24 hours with our streamlined process.",
-              },
-              {
-                icon: Wrench,
-                title: "Premium Warranty",
-                desc: "Complimentary 2-year warranty on all vehicles for complete peace of mind.",
-              },
-              {
-                icon: Zap,
-                title: "Best Prices",
-                desc: "Market-competitive pricing with transparent, no-haggle quotes guaranteed.",
-              },
-            ].map((item, i) => (
+            {whyChooseItems.map((item, i) => (
               <div
                 key={i}
                 className="bg-dark-card/60 backdrop-blur-sm border border-gold/10 hover:border-gold/40 rounded-xl p-8 text-center group hover:-translate-y-2 transition-all duration-500"
@@ -347,8 +363,8 @@ export default function Home() {
                 <div className="w-16 h-16 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center mx-auto mb-6 group-hover:bg-gold group-hover:shadow-glow transition-all duration-500">
                   <item.icon className="w-7 h-7 text-gold group-hover:text-dark transition-colors" />
                 </div>
-                <h3 className="text-white font-bold text-lg mb-3">{item.title}</h3>
-                <p className="text-white/60 text-sm leading-relaxed">{item.desc}</p>
+                <h3 className="text-white font-bold text-lg mb-3">{t(item.titleKey)}</h3>
+                <p className="text-white/60 text-sm leading-relaxed">{t(item.descKey)}</p>
               </div>
             ))}
           </div>
@@ -360,31 +376,32 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-              Browse By Type
+              {t("browseByType")}
             </span>
             <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
-              Vehicle Categories
+              {t("vehicleCategories")}
             </h2>
           </div>
 
-          <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-            {categories
-              .filter((c) => c !== "All")
-              .map((cat, i) => {
-                const icons = [Car, Gauge, Crown, Users, Zap, Award];
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 max-w-3xl mx-auto">
+            {listingTypeOptions
+              .filter((option) => option.value !== "All")
+              .map((option, i) => {
+                const icons = [Car, Clock, Award];
                 const Icon = icons[i] || Car;
-                const counts = [12, 8, 5, 15, 6, 4];
                 return (
                   <Link
-                    key={cat}
-                    to="/inventory"
+                    key={option.value}
+                    to={`/inventory?category=${option.value}`}
                     className="group bg-dark-card border border-gold/10 hover:border-gold/40 rounded-xl p-6 text-center transition-all duration-300 hover:-translate-y-1 hover:shadow-glow"
                   >
                     <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center mx-auto mb-4 group-hover:bg-gold transition-all">
                       <Icon className="w-5 h-5 text-gold group-hover:text-dark" />
                     </div>
-                    <h3 className="text-white font-semibold text-sm mb-1">{cat}</h3>
-                    <p className="text-white/50 text-xs">{counts[i]} vehicles</p>
+                    <h3 className="text-white font-semibold text-sm mb-1">{t(option.labelKey)}</h3>
+                    <p className="text-white/50 text-xs">
+                      {listingTypeCounts[option.value] ?? 0} {t("vehicles")}
+                    </p>
                   </Link>
                 );
               })}
@@ -405,15 +422,15 @@ export default function Home() {
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
             <div>
               <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-                Visit Our Showroom
+                {t("visitOurShowroom")}
               </span>
               <h2 className="text-3xl md:text-5xl font-bold text-white mt-3 mb-6">
-                Experience Luxury
+                {t("experienceLuxury")}
                 <br />
-                <span className="text-gold">In Person</span>
+                <span className="text-gold">{t("experienceLuxuryHighlight")}</span>
               </h2>
               <p className="text-white/70 text-lg mb-8 leading-relaxed">
-                Step into our state-of-the-art showroom and immerse yourself in the world of automotive excellence. Our expert consultants are ready to guide you through our curated collection.
+                {t("showroomDescription")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4">
                 <Link to="/contact">
@@ -421,7 +438,7 @@ export default function Home() {
                     size="lg"
                     className="bg-gold hover:bg-gold-light text-dark font-bold shadow-glow hover:shadow-glow-lg transition-all"
                   >
-                    Book Appointment
+                    {t("bookAppointment")}
                   </Button>
                 </Link>
                 <Link to="/inventory">
@@ -430,7 +447,7 @@ export default function Home() {
                     size="lg"
                     className="border-white/30 text-white hover:bg-white/10"
                   >
-                    Virtual Tour
+                    {t("virtualTour")}
                   </Button>
                 </Link>
               </div>
@@ -448,7 +465,7 @@ export default function Home() {
                   </div>
                   <div>
                     <p className="text-white font-bold">1,800+</p>
-                    <p className="text-white/60 text-xs">Happy Clients</p>
+                    <p className="text-white/60 text-xs">{t("happyClients")}</p>
                   </div>
                 </div>
               </div>
@@ -462,10 +479,10 @@ export default function Home() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
             <span className="text-gold text-sm font-medium tracking-[0.2em] uppercase">
-              Client Stories
+              {t("clientStories")}
             </span>
             <h2 className="text-3xl md:text-4xl font-bold text-white mt-3">
-              What Our Clients Say
+              {t("whatOurClientsSay")}
             </h2>
           </div>
 
@@ -493,7 +510,7 @@ export default function Home() {
                     </div>
                   </div>
                   <div className="hidden md:block">
-                    <p className="text-white/40 text-sm">Purchased:</p>
+                    <p className="text-white/40 text-sm">{t("purchased")}</p>
                     <p className="text-gold text-sm font-medium">
                       {testimonials[activeTestimonial].car}
                     </p>
@@ -523,7 +540,7 @@ export default function Home() {
       <section className="py-16 border-y border-gold/10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <p className="text-center text-white/40 text-sm mb-8 tracking-wider uppercase">
-            Trusted by the World's Finest Brands
+            {t("trustedByFinest")}
           </p>
           <div className="flex flex-wrap justify-center items-center gap-8 md:gap-16">
             {["BMW", "Mercedes", "Porsche", "Ferrari", "Lamborghini", "Audi", "Aston Martin", "Bentley"].map(
@@ -547,12 +564,12 @@ export default function Home() {
             <div className="absolute inset-0 bg-[url(/speed-lights.jpg)] bg-cover bg-center opacity-20" />
             <div className="relative z-10">
               <h2 className="text-3xl md:text-5xl font-bold text-white mb-6">
-                Ready to Find Your
+                {t("readyToFindDreamCar")}
                 <br />
-                <span className="text-gold">Dream Car?</span>
+                <span className="text-gold">{t("readyToFindDreamCarHighlight")}</span>
               </h2>
               <p className="text-white/70 text-lg mb-8 max-w-2xl mx-auto">
-                Join satisfied clients who found their perfect vehicle with Drive X. Start your journey today.
+                {t("dreamCarSubtitle")}
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <Link to="/inventory">
@@ -560,7 +577,7 @@ export default function Home() {
                     size="lg"
                     className="bg-gold hover:bg-gold-light text-dark font-bold px-8 py-6 shadow-glow hover:shadow-glow-lg transition-all"
                   >
-                    Browse Inventory
+                    {t("browseInventoryBtn")}
                     <ArrowRight className="w-5 h-5 ml-2" />
                   </Button>
                 </Link>
@@ -570,7 +587,7 @@ export default function Home() {
                     size="lg"
                     className="border-gold/50 text-gold hover:bg-gold/10 px-8 py-6"
                   >
-                    Create Account
+                    {t("createAccount")}
                   </Button>
                 </Link>
               </div>

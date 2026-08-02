@@ -167,6 +167,15 @@ export default function Navbar() {
                       {t("dashboard")}
                     </DropdownMenuItem>
                   )}
+                  {!isAdminLoggedIn && isLoggedIn && (
+                    <DropdownMenuItem
+                      onClick={() => navigate("/my-dashboard")}
+                      className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
+                    >
+                      <LayoutDashboard className="mr-2 h-4 w-4" />
+                      {t("myDashboard")}
+                    </DropdownMenuItem>
+                  )}
                   <DropdownMenuItem
                     onClick={() => navigate("/inventory")}
                     className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
@@ -248,6 +257,15 @@ export default function Navbar() {
                         className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
                       >
                       <LayoutDashboard className="w-4 h-4" /> {t("dashboard")}
+                      </Link>
+                    )}
+                    {!isAdminLoggedIn && isLoggedIn && (
+                      <Link
+                        to="/my-dashboard"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
+                      >
+                        <LayoutDashboard className="w-4 h-4" /> {t("myDashboard")}
                       </Link>
                     )}
                     <button

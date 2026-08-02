@@ -22,23 +22,26 @@ import {
   Mail,
   Activity,
   Clock,
+  Handshake,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { cars as fallbackCars } from "@/data/cars";
 import {
   createAdminCar,
+  createAdminDeal,
   deleteAdminCar,
+  deleteAdminDeal,
   getAdminCars,
   getAdminDashboardSummary,
+  getAdminDeals,
   getAdminLeads,
   updateAdminCar,
   updateAdminLead,
 } from "@/lib/admin-api";
 import { clearAuthTokens, getAccessToken } from "@/lib/api";
-import { getCurrentAdmin, logoutAdmin } from "@/lib/auth-api";
+import { getCurrentAdmin, logoutAdmin, updateAdminProfile } from "@/lib/auth-api";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
-import type { ApiCar, CarPayload, DashboardSummaryResponse, LeadResponse } from "@/lib/api-types";
+import type { ApiCar, CarPayload, DashboardSummaryResponse, DealResponse, LeadResponse } from "@/lib/api-types";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -70,16 +73,24 @@ const emptyCarForm = {
   description: "",
 };
 
+const emptyDealForm = {
+  leadId: "",
+  type: "SALE",
+  finalPriceAmount: "",
+  commissionType: "PERCENTAGE",
+  commissionValue: "",
+  notes: "",
+};
+
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState<{ name: string; email: string } | null>(null);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummaryResponse | null>(null);
   const [adminCars, setAdminCars] = useState<ApiCar[]>([]);
-  const [dashboardCars, setDashboardCars] = useState<CarView[]>(
-    fallbackCars.map((car) => ({ ...car, id: String(car.id), listingType: "SALE" as const, city: undefined }))
-  );
+  const [dashboardCars, setDashboardCars] = useState<CarView[]>([]);
   const [leads, setLeads] = useState<LeadResponse[]>([]);
+  const [deals, setDeals] = useState<DealResponse[]>([]);
   const [dashboardError, setDashboardError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [carDialogOpen, setCarDialogOpen] = useState(false);
@@ -87,6 +98,11 @@ export default function Dashboard() {
   const [carForm, setCarForm] = useState(emptyCarForm);
   const [isSavingCar, setIsSavingCar] = useState(false);
   const [carSearch, setCarSearch] = useState("");
+  const [profileNameInput, setProfileNameInput] = useState("");
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [dealDialogOpen, setDealDialogOpen] = useState(false);
+  const [dealForm, setDealForm] = useState(emptyDealForm);
+  const [isSavingDeal, setIsSavingDeal] = useState(false);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -108,27 +124,42 @@ export default function Dashboard() {
     getCurrentAdmin()
       .then((admin) => {
         setUser({ name: admin.fullName ?? "Admin User", email: admin.email });
+        setProfileNameInput(admin.fullName ?? "");
       })
       .catch(() => {
         navigate("/login");
       });
   }, [navigate]);
 
+  const saveProfile = async () => {
+    if (!profileNameInput.trim()) return;
+
+    setIsSavingProfile(true);
+    try {
+      const admin = await updateAdminProfile(profileNameInput.trim());
+      setUser({ name: admin.fullName ?? "Admin User", email: admin.email });
+      setActionMessage("Profile updated successfully.");
+    } catch (error) {
+      setActionMessage(error instanceof Error ? error.message : "Could not update profile.");
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
   const refreshDashboardData = async () => {
     if (!getAccessToken()) return;
 
-    const [summary, carsResponse, leadsResponse] = await Promise.all([
+    const [summary, carsResponse, leadsResponse, dealsResponse] = await Promise.all([
       getAdminDashboardSummary(),
       getAdminCars({ page: 1, limit: 20 }),
       getAdminLeads({ page: 1, limit: 20 }),
+      getAdminDeals({ page: 1, limit: 20 }),
     ]);
     setDashboardSummary(summary);
     setAdminCars(carsResponse.items);
-    const cars = mapApiCarsToView(carsResponse.items);
-    if (cars.length > 0) {
-      setDashboardCars(cars);
-    }
+    setDashboardCars(mapApiCarsToView(carsResponse.items));
     setLeads(leadsResponse.items);
+    setDeals(dealsResponse.items);
     setDashboardError("");
   };
 
@@ -260,6 +291,74 @@ export default function Dashboard() {
     }
   };
 
+  const dealtLeadIds = new Set(deals.map((deal) => deal.leadId));
+  const availableLeadsForDeal = leads.filter(
+    (lead) => lead.status === "APPROVED" && !dealtLeadIds.has(lead.id)
+  );
+
+  const openCreateDeal = () => {
+    setDealForm(emptyDealForm);
+    setDealDialogOpen(true);
+  };
+
+  const handleDealLeadChange = (leadId: string) => {
+    const lead = leads.find((item) => item.id === leadId);
+    setDealForm({
+      ...dealForm,
+      leadId,
+      type: lead?.intent === "RENT" ? "RENT" : "SALE",
+    });
+  };
+
+  const handleSaveDeal = async () => {
+    setIsSavingDeal(true);
+    setDashboardError("");
+    setActionMessage("");
+    try {
+      const lead = leads.find((item) => item.id === dealForm.leadId);
+      if (!lead) {
+        throw new Error("Select an approved lead to create a deal for.");
+      }
+      if (!dealForm.finalPriceAmount) {
+        throw new Error("Final price is required.");
+      }
+      if (!dealForm.commissionValue) {
+        throw new Error("Commission value is required.");
+      }
+
+      await createAdminDeal({
+        leadId: lead.id,
+        carId: lead.carId,
+        type: dealForm.type as "SALE" | "RENT",
+        finalPrice: { amount: Number(dealForm.finalPriceAmount), currency: "USD" },
+        commissionType: dealForm.commissionType as "PERCENTAGE" | "FIXED",
+        commissionValue: Number(dealForm.commissionValue),
+        notes: dealForm.notes || undefined,
+      });
+      setActionMessage("Deal created successfully.");
+      setDealDialogOpen(false);
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not create deal.");
+    } finally {
+      setIsSavingDeal(false);
+    }
+  };
+
+  const handleDeleteDeal = async (dealId: string) => {
+    const confirmed = window.confirm(
+      "Delete this deal? The car will go back to AVAILABLE and the lead back to APPROVED."
+    );
+    if (!confirmed) return;
+    try {
+      await deleteAdminDeal(dealId);
+      setActionMessage("Deal deleted successfully.");
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not delete deal.");
+    }
+  };
+
   const stats = [
     { label: "Total Cars", value: String(dashboardSummary?.totalCars ?? dashboardCars.length), change: "Live", icon: Car, trend: "up" },
     { label: "Active Listings", value: String(dashboardSummary?.availableCars ?? dashboardCars.filter((car) => car.status === "available").length), change: "Live", icon: Activity, trend: "up" },
@@ -298,6 +397,7 @@ export default function Dashboard() {
     { id: "overview", label: "Overview", icon: LayoutDashboard },
     { id: "cars", label: "My Cars", icon: Car },
     { id: "inquiries", label: "Inquiries", icon: MessageSquare },
+    { id: "deals", label: "Deals", icon: Handshake },
     { id: "favorites", label: "Favorites", icon: Heart },
     { id: "analytics", label: "Analytics", icon: TrendingUp },
     { id: "settings", label: "Settings", icon: Settings },
@@ -715,6 +815,91 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* Deals Tab */}
+            {activeTab === "deals" && (
+              <div className="space-y-6">
+                <div className="flex items-center justify-between">
+                  <p className="text-white/50 text-sm">
+                    Create a deal from an approved lead to mark a sale/rental as closed and record commission.
+                  </p>
+                  <Button
+                    onClick={openCreateDeal}
+                    disabled={availableLeadsForDeal.length === 0}
+                    className="bg-gold hover:bg-gold-light text-dark shrink-0"
+                  >
+                    <Plus className="w-4 h-4 mr-2" />
+                    Create Deal
+                  </Button>
+                </div>
+
+                <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gold/10">
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Car</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Type</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Final Price</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Commission</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Date</th>
+                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {deals.map((deal) => {
+                          const car = dashboardCars.find((item) => item.id === deal.carId);
+                          return (
+                            <tr key={deal.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
+                              <td className="px-4 py-3">
+                                <p className="text-white font-medium text-sm">
+                                  {car ? `${car.brand} ${car.model}` : deal.carId}
+                                </p>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-xs px-2 py-1 rounded-full bg-gold/10 text-gold">{deal.type}</span>
+                              </td>
+                              <td className="px-4 py-3 text-gold font-medium text-sm">
+                                {deal.finalPrice.amount.toLocaleString()} {deal.finalPrice.currency}
+                              </td>
+                              <td className="px-4 py-3 text-white/60 text-sm">
+                                {deal.commission.amount.toLocaleString()} {deal.commission.currency}
+                                <span className="text-white/30 text-xs">
+                                  {" "}
+                                  ({deal.commissionType === "PERCENTAGE" ? `${deal.commissionValue}%` : "fixed"})
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-white/60 text-sm">
+                                {new Date(deal.createdAt).toLocaleDateString()}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex items-center justify-end gap-2">
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleDeleteDeal(deal.id)}
+                                    className="text-red-400 hover:text-red-300 hover:bg-red-500/10 h-8 w-8 p-0"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </Button>
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {deals.length === 0 && (
+                          <tr>
+                            <td colSpan={6} className="px-4 py-8 text-center text-white/40 text-sm">
+                              No deals yet. Approve a lead first, then create a deal for it.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Favorites Tab */}
             {activeTab === "favorites" && (
               <div className="space-y-6">
@@ -801,26 +986,28 @@ export default function Dashboard() {
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
                         <label className="text-white/60 text-sm mb-2 block">Full Name</label>
-                        <Input defaultValue={user?.name || "Admin User"} className="bg-dark border-gold/20 text-white" />
+                        <Input
+                          value={profileNameInput}
+                          onChange={(e) => setProfileNameInput(e.target.value)}
+                          className="bg-dark border-gold/20 text-white"
+                        />
                       </div>
                       <div>
                         <label className="text-white/60 text-sm mb-2 block">Email</label>
-                        <Input defaultValue={user?.email || "admin@drivex.com"} className="bg-dark border-gold/20 text-white" />
+                        <Input
+                          value={user?.email || ""}
+                          disabled
+                          className="bg-dark border-gold/20 text-white/50 cursor-not-allowed"
+                        />
+                        <p className="text-white/30 text-xs mt-1">Email cannot be changed.</p>
                       </div>
                     </div>
-                    <div>
-                      <label className="text-white/60 text-sm mb-2 block">Phone</label>
-                      <Input defaultValue="+966 11 234 5678" className="bg-dark border-gold/20 text-white" />
-                    </div>
-                    <div>
-                      <label className="text-white/60 text-sm mb-2 block">Address</label>
-                      <Input defaultValue="King Fahd Road, Riyadh 11321, Saudi Arabia" className="bg-dark border-gold/20 text-white" />
-                    </div>
                     <Button
-                      onClick={() => setActionMessage("Profile settings endpoint is not available in the backend API yet.")}
+                      onClick={saveProfile}
+                      disabled={isSavingProfile || !profileNameInput.trim()}
                       className="bg-gold hover:bg-gold-light text-dark font-bold mt-4"
                     >
-                      Save Changes
+                      {isSavingProfile ? "Saving..." : "Save Changes"}
                     </Button>
                   </div>
                 </div>
@@ -1009,6 +1196,97 @@ export default function Dashboard() {
               className="bg-gold hover:bg-gold-light text-dark font-bold"
             >
               {isSavingCar ? "Saving..." : "Save Car"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={dealDialogOpen} onOpenChange={setDealDialogOpen}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Create Deal</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 gap-4">
+            <Select value={dealForm.leadId} onValueChange={handleDealLeadChange}>
+              <SelectTrigger className="bg-dark border-gold/20 text-white">
+                <SelectValue placeholder="Select an approved lead" />
+              </SelectTrigger>
+              <SelectContent className="bg-dark-card border-gold/20">
+                {availableLeadsForDeal.map((lead) => {
+                  const car = dashboardCars.find((item) => item.id === lead.carId);
+                  return (
+                    <SelectItem key={lead.id} value={lead.id}>
+                      {lead.fullName} — {car ? `${car.brand} ${car.model}` : lead.carId}
+                    </SelectItem>
+                  );
+                })}
+              </SelectContent>
+            </Select>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Select value={dealForm.type} onValueChange={(value) => setDealForm({ ...dealForm, type: value })}>
+                <SelectTrigger className="bg-dark border-gold/20 text-white">
+                  <SelectValue placeholder="Deal type" />
+                </SelectTrigger>
+                <SelectContent className="bg-dark-card border-gold/20">
+                  <SelectItem value="SALE">SALE</SelectItem>
+                  <SelectItem value="RENT">RENT</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                placeholder="Final price USD"
+                value={dealForm.finalPriceAmount}
+                onChange={(event) => setDealForm({ ...dealForm, finalPriceAmount: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <Select
+                value={dealForm.commissionType}
+                onValueChange={(value) => setDealForm({ ...dealForm, commissionType: value })}
+              >
+                <SelectTrigger className="bg-dark border-gold/20 text-white">
+                  <SelectValue placeholder="Commission type" />
+                </SelectTrigger>
+                <SelectContent className="bg-dark-card border-gold/20">
+                  <SelectItem value="PERCENTAGE">PERCENTAGE</SelectItem>
+                  <SelectItem value="FIXED">FIXED</SelectItem>
+                </SelectContent>
+              </Select>
+              <Input
+                type="number"
+                placeholder={dealForm.commissionType === "PERCENTAGE" ? "Commission %" : "Commission USD"}
+                value={dealForm.commissionValue}
+                onChange={(event) => setDealForm({ ...dealForm, commissionValue: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+            </div>
+
+            <Textarea
+              placeholder="Notes"
+              value={dealForm.notes}
+              onChange={(event) => setDealForm({ ...dealForm, notes: event.target.value })}
+              className="bg-dark border-gold/20 text-white min-h-20"
+            />
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setDealDialogOpen(false)}
+              className="border-gold/30 text-gold hover:bg-gold/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveDeal}
+              disabled={isSavingDeal || !dealForm.leadId}
+              className="bg-gold hover:bg-gold-light text-dark font-bold"
+            >
+              {isSavingDeal ? "Saving..." : "Save Deal"}
             </Button>
           </div>
         </DialogContent>

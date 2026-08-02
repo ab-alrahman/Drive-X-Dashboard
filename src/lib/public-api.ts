@@ -7,6 +7,7 @@ import type {
   CreateLeadRequest,
   FiltersMetaResponse,
   LeadCreatedResponse,
+  LeadResponse,
   PaginatedResponse,
 } from "./api-types";
 
@@ -60,6 +61,16 @@ export async function registerCustomer(payload: {
   return response;
 }
 
+export async function loginCustomer(email: string, password: string) {
+  const response = await apiFetch<CustomerAuthResponse>("/v1/public/auth/login", {
+    method: "POST",
+    body: JSON.stringify({ email, password }),
+  });
+  setCustomerAuthTokens(response.accessToken, response.refreshToken);
+  localStorage.setItem("drive_x_customer", JSON.stringify(response.customer));
+  return response;
+}
+
 export function getCurrentCustomer() {
   return apiFetch<CustomerProfile>("/v1/public/auth/me", { auth: "customer" });
 }
@@ -78,6 +89,21 @@ export function addFavoriteCar(carId: string) {
 export function removeFavoriteCar(carId: string) {
   return apiFetch<{ carId: string; favorited: false }>(`/v1/public/me/favorites/${carId}`, {
     method: "DELETE",
+    auth: "customer",
+  });
+}
+
+export function getMyLeads(params: { page?: number; limit?: number; status?: string; intent?: string } = {}) {
+  return apiFetch<PaginatedResponse<LeadResponse & { car?: { brand: string; model: string; year: number; imageUrl?: string } }>>(
+    `/v1/public/me/leads${toQueryString({ ...params })}`,
+    { auth: "customer" }
+  );
+}
+
+export function updateMyProfile(payload: { fullName?: string; phone?: string }) {
+  return apiFetch<CustomerProfile>("/v1/public/me", {
+    method: "PATCH",
+    body: JSON.stringify(payload),
     auth: "customer",
   });
 }

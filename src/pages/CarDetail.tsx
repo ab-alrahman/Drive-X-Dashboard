@@ -21,7 +21,6 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { cars as fallbackCars } from "@/data/cars";
 import { getCustomerAccessToken } from "@/lib/api";
 import { mapApiCarToView, mapApiCarsToView, type CarView } from "@/lib/car-mapper";
 import { addFavoriteCar, createLead, getFavoriteCars, getPublicCar, getPublicCars, removeFavoriteCar } from "@/lib/public-api";
@@ -33,10 +32,12 @@ import {
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
+import { useI18n } from "@/lib/i18n";
 
 export default function CarDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [activeImage, setActiveImage] = useState(0);
   const [isFavorite, setIsFavorite] = useState(false);
   const [showContact, setShowContact] = useState(false);
@@ -57,24 +58,14 @@ export default function CarDetail() {
       .then((response) => {
         setCar(mapApiCarToView(response));
       })
-      .catch(() => {
-        const fallback = fallbackCars.find((c) => String(c.id) === id);
-        setCar(fallback ? { ...fallback, id: String(fallback.id), listingType: "SALE" as const, city: undefined } : null);
-      })
+      .catch(() => setCar(null))
       .finally(() => setIsLoading(false));
   }, [id]);
 
   useEffect(() => {
     getPublicCars({ page: 1, limit: 6, sortBy: "newest" })
       .then((response) => setRelatedCars(mapApiCarsToView(response.items).filter((c) => c.id !== id).slice(0, 3)))
-      .catch(() => {
-        setRelatedCars(
-          fallbackCars
-            .filter((c) => String(c.id) !== id)
-            .slice(0, 3)
-            .map((c) => ({ ...c, id: String(c.id), listingType: "SALE" as const, city: undefined }))
-        );
-      });
+      .catch(() => setRelatedCars([]));
   }, [id]);
 
   useEffect(() => {
@@ -88,7 +79,7 @@ export default function CarDetail() {
   const toggleFavorite = async () => {
     if (!car) return;
     if (!getCustomerAccessToken()) {
-      setFavoriteMessage("Create an account or sign in to save favorites.");
+      setFavoriteMessage(t("createAccountOrSignIn"));
       navigate("/register");
       return;
     }
@@ -105,7 +96,7 @@ export default function CarDetail() {
       }
     } catch (error) {
       setIsFavorite(!nextValue);
-      setFavoriteMessage(error instanceof Error ? error.message : "Could not update favorites.");
+      setFavoriteMessage(error instanceof Error ? error.message : t("couldNotUpdateFavorites"));
     }
   };
 
@@ -116,7 +107,7 @@ export default function CarDetail() {
 
     try {
       if (!contactForm.name || !contactForm.phone) {
-        throw new Error("Name and phone number are required.");
+        throw new Error(t("nameAndPhoneRequired"));
       }
       const response = await createLead({
         carId: car.id,
@@ -128,10 +119,10 @@ export default function CarDetail() {
         message: contactForm.message || `Interested in ${car.brand} ${car.model}`,
         requestDelivery: false,
       });
-      setSubmitMessage(response.message || "Your request has been received.");
+      setSubmitMessage(response.message || t("requestReceived"));
       setContactForm({ name: "", email: "", phone: "", message: "" });
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : "Could not send your request.");
+      setSubmitError(error instanceof Error ? error.message : t("couldNotSendRequest"));
     }
   };
 
@@ -159,7 +150,7 @@ export default function CarDetail() {
   if (isLoading) {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center pt-20">
-        <div className="text-gold font-semibold">Loading vehicle...</div>
+        <div className="text-gold font-semibold">{t("loadingVehicle")}</div>
       </div>
     );
   }
@@ -168,10 +159,10 @@ export default function CarDetail() {
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center pt-20">
         <div className="text-center">
-          <h2 className="text-white text-2xl font-bold mb-4">Car Not Found</h2>
+          <h2 className="text-white text-2xl font-bold mb-4">{t("carNotFound")}</h2>
           <Link to="/inventory">
             <Button className="bg-gold hover:bg-gold-light text-dark">
-              Browse Inventory
+              {t("browseInventoryBtn")}
             </Button>
           </Link>
         </div>
@@ -180,16 +171,16 @@ export default function CarDetail() {
   }
 
   const specs = [
-    { icon: Calendar, label: "Year", value: car.year },
-    { icon: Gauge, label: "Mileage", value: car.mileage },
-    { icon: Fuel, label: "Fuel Type", value: car.fuelType },
-    { icon: Cog, label: "Transmission", value: car.transmission },
-    { icon: Palette, label: "Color", value: car.color },
-    { icon: Zap, label: "Engine", value: car.engine },
-    { icon: Zap, label: "Power", value: car.power },
-    { icon: Zap, label: "0-100 km/h", value: car.acceleration },
-    { icon: Gauge, label: "Top Speed", value: car.topSpeed },
-    { icon: Award, label: "Condition", value: car.condition },
+    { icon: Calendar, labelKey: "year" as const, value: car.year },
+    { icon: Gauge, labelKey: "mileage" as const, value: car.mileage },
+    { icon: Fuel, labelKey: "fuelType" as const, value: car.fuelType },
+    { icon: Cog, labelKey: "transmission" as const, value: car.transmission },
+    { icon: Palette, labelKey: "color" as const, value: car.color },
+    { icon: Zap, labelKey: "engineSpec" as const, value: car.engine },
+    { icon: Zap, labelKey: "powerSpec" as const, value: car.power },
+    { icon: Zap, labelKey: "zeroToHundred" as const, value: car.acceleration },
+    { icon: Gauge, labelKey: "topSpeed" as const, value: car.topSpeed },
+    { icon: Award, labelKey: "condition" as const, value: car.condition },
   ];
 
   return (
@@ -197,9 +188,9 @@ export default function CarDetail() {
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Breadcrumb */}
         <div className="flex items-center gap-2 text-white/50 text-sm mb-6">
-          <Link to="/" className="hover:text-gold transition-colors">Home</Link>
+          <Link to="/" className="hover:text-gold transition-colors">{t("homeBreadcrumb")}</Link>
           <ChevronRight className="w-4 h-4" />
-          <Link to="/inventory" className="hover:text-gold transition-colors">Inventory</Link>
+          <Link to="/inventory" className="hover:text-gold transition-colors">{t("inventory")}</Link>
           <ChevronRight className="w-4 h-4" />
           <span className="text-gold">{car.brand} {car.model}</span>
         </div>
@@ -208,7 +199,7 @@ export default function CarDetail() {
         <Link to="/inventory">
           <Button variant="ghost" className="text-white/50 hover:text-gold mb-4 -ml-2">
             <ArrowLeft className="w-4 h-4 mr-2" />
-            Back to Inventory
+            {t("backToInventory")}
           </Button>
         </Link>
 
@@ -228,7 +219,7 @@ export default function CarDetail() {
                 </span>
                 {car.originalPrice && (
                   <span className="bg-red-500/90 text-white text-xs font-bold px-3 py-1.5 rounded-full">
-                    Special Offer
+                    {t("specialOffer")}
                   </span>
                 )}
               </div>
@@ -281,7 +272,7 @@ export default function CarDetail() {
                   <span className="w-1 h-1 rounded-full bg-gold" />
                   <span className="flex items-center gap-1 text-gold">
                     <Star className="w-4 h-4 fill-current" />
-                    {car.rating} ({car.reviews} reviews)
+                    {car.rating} ({car.reviews} {t("reviews")})
                   </span>
                 </div>
               </div>
@@ -295,7 +286,7 @@ export default function CarDetail() {
             <div className="bg-dark-card border border-gold/20 rounded-xl p-6 mb-6">
               <div className="flex items-end justify-between mb-4">
                 <div>
-                  <p className="text-white/50 text-sm mb-1">Price</p>
+                  <p className="text-white/50 text-sm mb-1">{t("price")}</p>
                   <div className="flex items-baseline gap-3">
                     <span className="text-gold font-bold text-4xl">
                       ${car.price.toLocaleString()}
@@ -308,12 +299,12 @@ export default function CarDetail() {
                   </div>
                   {car.originalPrice && (
                     <p className="text-green-400 text-sm mt-1">
-                      Save ${(car.originalPrice - car.price).toLocaleString()}
+                      {t("save")} ${(car.originalPrice - car.price).toLocaleString()}
                     </p>
                   )}
                 </div>
                 <div className="text-right">
-                  <p className="text-white/50 text-sm">Status</p>
+                  <p className="text-white/50 text-sm">{t("status")}</p>
                   <span
                     className={`text-sm font-semibold ${
                       car.status === "available"
@@ -323,7 +314,7 @@ export default function CarDetail() {
                         : "text-red-400"
                     }`}
                   >
-                    {car.status.charAt(0).toUpperCase() + car.status.slice(1)}
+                    {car.status === "available" ? t("available") : car.status.charAt(0).toUpperCase() + car.status.slice(1)}
                   </span>
                 </div>
               </div>
@@ -334,7 +325,7 @@ export default function CarDetail() {
                   className="bg-gold hover:bg-gold-light text-dark font-bold py-6 shadow-glow hover:shadow-glow-lg transition-all"
                 >
                   <Phone className="w-5 h-5 mr-2" />
-                  Contact Dealer
+                  {t("contactDealer")}
                 </Button>
                 <Button
                   variant="outline"
@@ -342,7 +333,7 @@ export default function CarDetail() {
                   className="border-gold/30 text-gold hover:bg-gold/10 py-6"
                 >
                   <MessageSquare className="w-5 h-5 mr-2" />
-                  Send Inquiry
+                  {t("sendInquiry")}
                 </Button>
               </div>
             </div>
@@ -351,11 +342,11 @@ export default function CarDetail() {
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mb-6">
               {specs.slice(0, 6).map((spec) => (
                 <div
-                  key={spec.label}
+                  key={spec.labelKey}
                   className="bg-dark-card border border-gold/10 rounded-lg p-3"
                 >
                   <spec.icon className="w-4 h-4 text-gold mb-1" />
-                  <p className="text-white/50 text-xs">{spec.label}</p>
+                  <p className="text-white/50 text-xs">{t(spec.labelKey)}</p>
                   <p className="text-white font-semibold text-sm truncate">{spec.value}</p>
                 </div>
               ))}
@@ -363,7 +354,7 @@ export default function CarDetail() {
 
             {/* Description */}
             <div className="mb-6">
-              <h3 className="text-white font-bold text-lg mb-3">Description</h3>
+              <h3 className="text-white font-bold text-lg mb-3">{t("description")}</h3>
               <p className="text-white/60 leading-relaxed">{car.description}</p>
             </div>
           </div>
@@ -374,7 +365,7 @@ export default function CarDetail() {
           {/* Features */}
           <div className="lg:col-span-2">
             <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
-              <h3 className="text-white font-bold text-xl mb-6">Features & Equipment</h3>
+              <h3 className="text-white font-bold text-xl mb-6">{t("featuresAndEquipment")}</h3>
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {car.features.map((feature) => (
                   <div key={feature} className="flex items-center gap-3">
@@ -391,13 +382,13 @@ export default function CarDetail() {
           {/* Full Specs */}
           <div>
             <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
-              <h3 className="text-white font-bold text-xl mb-6">Specifications</h3>
+              <h3 className="text-white font-bold text-xl mb-6">{t("specifications")}</h3>
               <div className="space-y-4">
                 {specs.map((spec) => (
-                  <div key={spec.label} className="flex items-center justify-between">
+                  <div key={spec.labelKey} className="flex items-center justify-between">
                     <div className="flex items-center gap-2 text-white/50">
                       <spec.icon className="w-4 h-4" />
-                      <span className="text-sm">{spec.label}</span>
+                      <span className="text-sm">{t(spec.labelKey)}</span>
                     </div>
                     <span className="text-white font-medium text-sm">{spec.value}</span>
                   </div>
@@ -410,17 +401,17 @@ export default function CarDetail() {
         {/* Trust Badges */}
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-12">
           {[
-            { icon: Shield, title: "Verified Vehicle", desc: "200-point inspection completed" },
-            { icon: Clock, title: "Warranty Included", desc: "2-year comprehensive coverage" },
-            { icon: Award, title: "Money Back Guarantee", desc: "7-day return policy" },
+            { icon: Shield, titleKey: "verifiedVehicle" as const, descKey: "verifiedVehicleDesc" as const },
+            { icon: Clock, titleKey: "warrantyIncluded" as const, descKey: "warrantyIncludedDesc" as const },
+            { icon: Award, titleKey: "moneyBackGuarantee" as const, descKey: "moneyBackGuaranteeDesc" as const },
           ].map((item) => (
-            <div key={item.title} className="bg-dark-card border border-gold/10 rounded-xl p-6 flex items-center gap-4">
+            <div key={item.titleKey} className="bg-dark-card border border-gold/10 rounded-xl p-6 flex items-center gap-4">
               <div className="w-12 h-12 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
                 <item.icon className="w-6 h-6 text-gold" />
               </div>
               <div>
-                <h4 className="text-white font-semibold">{item.title}</h4>
-                <p className="text-white/50 text-sm">{item.desc}</p>
+                <h4 className="text-white font-semibold">{t(item.titleKey)}</h4>
+                <p className="text-white/50 text-sm">{t(item.descKey)}</p>
               </div>
             </div>
           ))}
@@ -430,10 +421,10 @@ export default function CarDetail() {
         {relatedCars.length > 0 && (
           <div>
             <div className="flex items-center justify-between mb-6">
-              <h3 className="text-white font-bold text-2xl">Similar Vehicles</h3>
+              <h3 className="text-white font-bold text-2xl">{t("similarVehicles")}</h3>
               <Link to="/inventory">
                 <Button variant="ghost" className="text-gold hover:text-gold-light hover:bg-gold/10">
-                  View All
+                  {t("viewAll")}
                   <ChevronRight className="w-4 h-4 ml-1" />
                 </Button>
               </Link>
@@ -471,7 +462,7 @@ export default function CarDetail() {
         <DialogContent className="bg-dark-card border-gold/30 max-w-md">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">
-              Contact Dealer
+              {t("contactDealer")}
             </DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
@@ -481,27 +472,27 @@ export default function CarDetail() {
             </div>
             <div className="space-y-3">
               <Input
-                placeholder="Your Name"
+                placeholder={t("yourName")}
                 value={contactForm.name}
                 onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30"
               />
               <Input
                 type="email"
-                placeholder="Email Address"
+                placeholder={t("emailAddress")}
                 value={contactForm.email}
                 onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30"
               />
               <Input
                 type="tel"
-                placeholder="Phone Number"
+                placeholder={t("phoneNumber")}
                 value={contactForm.phone}
                 onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30"
               />
               <Textarea
-                placeholder="Your message..."
+                placeholder={t("yourMessage")}
                 value={contactForm.message}
                 onChange={(e) => setContactForm({ ...contactForm, message: e.target.value })}
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30 min-h-[100px]"
@@ -519,7 +510,7 @@ export default function CarDetail() {
             )}
             <Button onClick={handleLeadSubmit} className="w-full bg-gold hover:bg-gold-light text-dark font-bold">
               <Mail className="w-5 h-5 mr-2" />
-              Send Message
+              {t("sendMessage")}
             </Button>
           </div>
         </DialogContent>
@@ -529,22 +520,22 @@ export default function CarDetail() {
       <Dialog open={showShare} onOpenChange={setShowShare}>
         <DialogContent className="bg-dark-card border-gold/30 max-w-sm">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Share This Car</DialogTitle>
+            <DialogTitle className="text-white text-xl">{t("shareThisCar")}</DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-4 gap-3">
             {[
-              { name: "Copy Link", icon: Share2 },
-              { name: "WhatsApp", icon: Phone },
-              { name: "Email", icon: Mail },
-              { name: "Message", icon: MessageSquare },
+              { name: "copyLink" as const, icon: Share2, shareKey: "Copy Link" },
+              { name: "whatsapp" as const, icon: Phone, shareKey: "WhatsApp" },
+              { name: "emailShare" as const, icon: Mail, shareKey: "Email" },
+              { name: "messageShare" as const, icon: MessageSquare, shareKey: "Message" },
             ].map((item) => (
               <button
-                key={item.name}
-                onClick={() => handleShareAction(item.name)}
+                key={item.shareKey}
+                onClick={() => handleShareAction(item.shareKey)}
                 className="flex flex-col items-center gap-2 p-3 bg-dark border border-gold/20 rounded-lg hover:border-gold/50 transition-colors"
               >
                 <item.icon className="w-6 h-6 text-gold" />
-                <span className="text-white/60 text-xs">{item.name}</span>
+                <span className="text-white/60 text-xs">{t(item.name)}</span>
               </button>
             ))}
           </div>

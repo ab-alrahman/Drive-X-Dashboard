@@ -7,8 +7,10 @@ import Register from './pages/Register'
 import Inventory from './pages/Inventory'
 import CarDetail from './pages/CarDetail'
 import Dashboard from './pages/Dashboard'
+import CustomerDashboard from './pages/CustomerDashboard'
 import About from './pages/About'
 import Contact from './pages/Contact'
+import RequireAuth from './components/RequireAuth'
 import { I18nProvider } from './lib/i18n'
 
 export default function App() {
@@ -23,7 +25,8 @@ export default function App() {
           <Route path="/register" element={<Register />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/car/:id" element={<CarDetail />} />
-          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/dashboard" element={<RequireAuth role="admin"><Dashboard /></RequireAuth>} />
+          <Route path="/my-dashboard" element={<RequireAuth role="customer"><CustomerDashboard /></RequireAuth>} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
         </Routes>

@@ -25,6 +25,14 @@ export function getCurrentAdmin() {
   return apiFetch<AdminProfile>("/v1/admin/auth/me", { auth: true });
 }
 
+export function updateAdminProfile(fullName: string) {
+  return apiFetch<AdminProfile>("/v1/admin/auth/me", {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify({ fullName }),
+  });
+}
+
 export async function logoutAdmin() {
   const refreshToken = getRefreshToken();
   if (refreshToken) {
