@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useNavigate, Link } from "react-router";
 import {
   LayoutDashboard,
@@ -23,6 +23,12 @@ import {
   Activity,
   Clock,
   Handshake,
+  ShieldCheck,
+  ShieldAlert,
+  Flag,
+  Eye,
+  EyeOff,
+  X,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,10 +44,47 @@ import {
   updateAdminCar,
   updateAdminLead,
 } from "@/lib/admin-api";
-import { clearAuthTokens, getAccessToken } from "@/lib/api";
+import { clearAuthTokens, getAccessToken, getAdminSessionProfile } from "@/lib/api";
 import { getCurrentAdmin, logoutAdmin, updateAdminProfile } from "@/lib/auth-api";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
-import type { ApiCar, CarPayload, DashboardSummaryResponse, DealResponse, LeadResponse } from "@/lib/api-types";
+import type {
+  ApiCar,
+  CarPayload,
+  Complaint,
+  DashboardSummaryResponse,
+  DealResponse,
+  InspectionCase,
+  InspectionFindingSeverity,
+  InspectionPaidBy,
+  InspectionServiceTier,
+  LeadResponse,
+  Technician,
+  Vendor,
+} from "@/lib/api-types";
+import {
+  cancelInspectionRound,
+  certifyInspectionRound,
+  createTechnician,
+  getAdminCarInspection,
+  getTechnicians,
+  requestTechnicianVisit,
+  scheduleInspectionRound,
+  startInspectionRound,
+  submitInspectionReport,
+  submitSellerInspection,
+  updateTechnician,
+  uploadInspectionFile,
+} from "@/lib/inspections-api";
+import {
+  flagRoundFraudulent,
+  getPlatformComplaints,
+  getPlatformVendors,
+  hidePlatformCar,
+  reviewComplaint,
+  suspendVendor,
+  unhidePlatformCar,
+  unsuspendVendor,
+} from "@/lib/vendors-api";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import {
@@ -51,6 +94,16 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+
+const emptyReportFinding = { description: "", severity: "MINOR" as InspectionFindingSeverity, costAmount: "" };
+
+const emptyTechnicianForm = {
+  name: "",
+  city: "",
+  phone: "",
+  serviceTiers: [] as InspectionServiceTier[],
+  specialty: "",
+};
 
 const emptyCarForm = {
   brand: "",
@@ -77,15 +130,14 @@ const emptyDealForm = {
   leadId: "",
   type: "SALE",
   finalPriceAmount: "",
-  commissionType: "PERCENTAGE",
-  commissionValue: "",
   notes: "",
 };
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [activeTab, setActiveTab] = useState("overview");
-  const [user, setUser] = useState<{ name: string; email: string } | null>(null);
+  const [user, setUser] = useState<{ name: string; email: string; role?: string } | null>(null);
+  const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
   const [dashboardSummary, setDashboardSummary] = useState<DashboardSummaryResponse | null>(null);
   const [adminCars, setAdminCars] = useState<ApiCar[]>([]);
   const [dashboardCars, setDashboardCars] = useState<CarView[]>([]);
@@ -103,6 +155,31 @@ export default function Dashboard() {
   const [dealDialogOpen, setDealDialogOpen] = useState(false);
   const [dealForm, setDealForm] = useState(emptyDealForm);
   const [isSavingDeal, setIsSavingDeal] = useState(false);
+  const [technicians, setTechnicians] = useState<Technician[]>([]);
+  const [inspectionDialogOpen, setInspectionDialogOpen] = useState(false);
+  const [inspectionCarId, setInspectionCarId] = useState<string | null>(null);
+  const [inspectionCase, setInspectionCase] = useState<InspectionCase | null>(null);
+  const [isLoadingInspection, setIsLoadingInspection] = useState(false);
+  const [inspectionActionLoading, setInspectionActionLoading] = useState(false);
+  const [inspectionSourceType, setInspectionSourceType] = useState<"EXTERNAL_FILE" | "TEMPLATE">("TEMPLATE");
+  const [inspectionTemplateNotes, setInspectionTemplateNotes] = useState("");
+  const [inspectionFile, setInspectionFile] = useState<File | null>(null);
+  const [scheduleTechnicianId, setScheduleTechnicianId] = useState("");
+  const [scheduleDateTime, setScheduleDateTime] = useState("");
+  const [reportVerdict, setReportVerdict] = useState("");
+  const [reportPriceAmount, setReportPriceAmount] = useState("");
+  const [reportPaidBy, setReportPaidBy] = useState<InspectionPaidBy>("BUYER");
+  const [reportFindings, setReportFindings] = useState([emptyReportFinding]);
+  const [technicianDialogOpen, setTechnicianDialogOpen] = useState(false);
+  const [editingTechnicianId, setEditingTechnicianId] = useState<string | null>(null);
+  const [technicianForm, setTechnicianForm] = useState(emptyTechnicianForm);
+  const [isSavingTechnician, setIsSavingTechnician] = useState(false);
+  const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [complaintDialogOpen, setComplaintDialogOpen] = useState(false);
+  const [reviewingComplaint, setReviewingComplaint] = useState<Complaint | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
+  const [isReviewing, setIsReviewing] = useState(false);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -110,10 +187,12 @@ export default function Dashboard() {
       return;
     }
 
-    const auth = localStorage.getItem("drive_x_auth");
+    const auth = getAdminSessionProfile();
     if (auth) {
       try {
-        setUser(JSON.parse(auth));
+        const parsed = JSON.parse(auth);
+        setUser(parsed);
+        setIsPlatformAdmin(parsed.role === "PLATFORM_ADMIN");
       } catch {
         clearAuthTokens();
         navigate("/login");
@@ -123,8 +202,9 @@ export default function Dashboard() {
 
     getCurrentAdmin()
       .then((admin) => {
-        setUser({ name: admin.fullName ?? "Admin User", email: admin.email });
+        setUser({ name: admin.fullName ?? "Admin User", email: admin.email, role: admin.role });
         setProfileNameInput(admin.fullName ?? "");
+        setIsPlatformAdmin(admin.role === "PLATFORM_ADMIN");
       })
       .catch(() => {
         navigate("/login");
@@ -149,17 +229,19 @@ export default function Dashboard() {
   const refreshDashboardData = async () => {
     if (!getAccessToken()) return;
 
-    const [summary, carsResponse, leadsResponse, dealsResponse] = await Promise.all([
+    const [summary, carsResponse, leadsResponse, dealsResponse, techniciansResponse] = await Promise.all([
       getAdminDashboardSummary(),
       getAdminCars({ page: 1, limit: 20 }),
       getAdminLeads({ page: 1, limit: 20 }),
       getAdminDeals({ page: 1, limit: 20 }),
+      getTechnicians(),
     ]);
     setDashboardSummary(summary);
     setAdminCars(carsResponse.items);
     setDashboardCars(mapApiCarsToView(carsResponse.items));
     setLeads(leadsResponse.items);
     setDeals(dealsResponse.items);
+    setTechnicians(techniciansResponse);
     setDashboardError("");
   };
 
@@ -168,6 +250,24 @@ export default function Dashboard() {
       setDashboardError(error.message || "Could not load dashboard data.");
     });
   }, []);
+
+  const refreshPlatformData = useCallback(async () => {
+    if (!isPlatformAdmin) return;
+    const [vendorList, complaintsResponse] = await Promise.all([
+      getPlatformVendors(),
+      getPlatformComplaints({ page: 1, limit: 50 }),
+    ]);
+    setVendors(vendorList);
+    setComplaints(complaintsResponse.items);
+  }, [isPlatformAdmin]);
+
+  useEffect(() => {
+    if (isPlatformAdmin) {
+      refreshPlatformData().catch((error: Error) => {
+        setDashboardError(error.message || "Could not load platform data.");
+      });
+    }
+  }, [isPlatformAdmin, refreshPlatformData]);
 
   const handleLogout = async () => {
     await logoutAdmin();
@@ -257,11 +357,17 @@ export default function Dashboard() {
       if (editingCarId) {
         await updateAdminCar(editingCarId, carPayloadFromForm());
         setActionMessage("Car updated successfully.");
+        setCarDialogOpen(false);
       } else {
-        await createAdminCar(carPayloadFromForm());
-        setActionMessage("Car created successfully.");
+        // New cars can't be published (AVAILABLE/RESERVED) until they have an accepted
+        // maintenance file/inspection - the backend enforces this, so force a safe status
+        // on create regardless of what the form's Status field says, then guide the admin
+        // straight into submitting that inspection for the car they just made.
+        const created = await createAdminCar({ ...carPayloadFromForm(), status: "INACTIVE" });
+        setActionMessage("Car created as Inactive. Add a maintenance file/inspection below to publish it.");
+        setCarDialogOpen(false);
+        openInspectionDialog(created.id);
       }
-      setCarDialogOpen(false);
       await refreshDashboardData();
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : "Could not save car.");
@@ -322,17 +428,12 @@ export default function Dashboard() {
       if (!dealForm.finalPriceAmount) {
         throw new Error("Final price is required.");
       }
-      if (!dealForm.commissionValue) {
-        throw new Error("Commission value is required.");
-      }
 
       await createAdminDeal({
         leadId: lead.id,
         carId: lead.carId,
         type: dealForm.type as "SALE" | "RENT",
         finalPrice: { amount: Number(dealForm.finalPriceAmount), currency: "USD" },
-        commissionType: dealForm.commissionType as "PERCENTAGE" | "FIXED",
-        commissionValue: Number(dealForm.commissionValue),
         notes: dealForm.notes || undefined,
       });
       setActionMessage("Deal created successfully.");
@@ -356,6 +457,349 @@ export default function Dashboard() {
       await refreshDashboardData();
     } catch (error) {
       setDashboardError(error instanceof Error ? error.message : "Could not delete deal.");
+    }
+  };
+
+  const resetInspectionForms = () => {
+    setInspectionSourceType("TEMPLATE");
+    setInspectionTemplateNotes("");
+    setInspectionFile(null);
+    setScheduleTechnicianId("");
+    setScheduleDateTime("");
+    setReportVerdict("");
+    setReportPriceAmount("");
+    setReportPaidBy("BUYER");
+    setReportFindings([emptyReportFinding]);
+  };
+
+  const openInspectionDialog = async (carId: string) => {
+    setInspectionCarId(carId);
+    setInspectionDialogOpen(true);
+    resetInspectionForms();
+    setIsLoadingInspection(true);
+    try {
+      setInspectionCase(await getAdminCarInspection(carId));
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not load inspection data.");
+    } finally {
+      setIsLoadingInspection(false);
+    }
+  };
+
+  const refreshInspectionCase = async () => {
+    if (!inspectionCarId) return;
+    setInspectionCase(await getAdminCarInspection(inspectionCarId));
+    await refreshDashboardData();
+  };
+
+  const latestInspectionRound = inspectionCase?.rounds[0];
+
+  const handleSubmitSellerInspection = async () => {
+    if (!inspectionCarId) return;
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      if (inspectionSourceType === "EXTERNAL_FILE") {
+        if (!inspectionFile) throw new Error("Choose a file to upload.");
+        const { url } = await uploadInspectionFile(inspectionCarId, inspectionFile);
+        await submitSellerInspection(inspectionCarId, { sourceType: "EXTERNAL_FILE", externalFileUrl: url });
+      } else {
+        if (!inspectionTemplateNotes.trim()) throw new Error("Fill in the maintenance details.");
+        await submitSellerInspection(inspectionCarId, {
+          sourceType: "TEMPLATE",
+          templateData: { notes: inspectionTemplateNotes.trim() },
+        });
+      }
+      setActionMessage("Maintenance file accepted. The car can now be published.");
+      resetInspectionForms();
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not submit maintenance file.");
+    } finally {
+      setInspectionActionLoading(false);
+    }
+  };
+
+  const handleRequestTechnicianVisit = async (role: "SELLER" | "BUYER" | "RENTER") => {
+    if (!inspectionCarId) return;
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      await requestTechnicianVisit(inspectionCarId, { requestedByRole: role });
+      setActionMessage("Technician visit requested - schedule it below.");
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not request a technician visit.");
+    } finally {
+      setInspectionActionLoading(false);
+    }
+  };
+
+  const handleScheduleRound = async () => {
+    if (!latestInspectionRound) return;
+    if (!scheduleTechnicianId || !scheduleDateTime) {
+      setDashboardError("Pick a technician and a date/time.");
+      return;
+    }
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      await scheduleInspectionRound(latestInspectionRound.id, {
+        technicianId: scheduleTechnicianId,
+        scheduledAt: new Date(scheduleDateTime).toISOString(),
+      });
+      setActionMessage("Inspection scheduled.");
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not schedule the inspection.");
+    } finally {
+      setInspectionActionLoading(false);
+    }
+  };
+
+  const handleStartRound = async () => {
+    if (!latestInspectionRound) return;
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      await startInspectionRound(latestInspectionRound.id);
+      setActionMessage("Inspection marked in progress.");
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not start the inspection.");
+    } finally {
+      setInspectionActionLoading(false);
+    }
+  };
+
+  const addFindingRow = () => setReportFindings([...reportFindings, emptyReportFinding]);
+  const removeFindingRow = (index: number) => setReportFindings(reportFindings.filter((_, i) => i !== index));
+  const updateFindingRow = (index: number, patch: Partial<typeof emptyReportFinding>) =>
+    setReportFindings(reportFindings.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+
+  const handleSubmitReport = async () => {
+    if (!latestInspectionRound) return;
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      const findings = reportFindings
+        .filter((row) => row.description.trim())
+        .map((row) => ({
+          description: row.description.trim(),
+          severity: row.severity,
+          estimatedRepairCostAmount: row.costAmount ? Number(row.costAmount) : undefined,
+          estimatedRepairCostCurrency: row.costAmount ? ("USD" as const) : undefined,
+        }));
+      await submitInspectionReport(latestInspectionRound.id, {
+        overallVerdict: reportVerdict || undefined,
+        priceAmount: reportPriceAmount ? Number(reportPriceAmount) : undefined,
+        priceCurrency: reportPriceAmount ? "USD" : undefined,
+        paidBy: reportPaidBy,
+        findings,
+      });
+      setActionMessage("Inspection report submitted - certify it to finalize.");
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not submit the report.");
+    } finally {
+      setInspectionActionLoading(false);
+    }
+  };
+
+  const handleCertifyRound = async () => {
+    if (!latestInspectionRound) return;
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      await certifyInspectionRound(latestInspectionRound.id);
+      setActionMessage("Inspection certified - Drive X Certified badge is now live on this car.");
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not certify the inspection.");
+    } finally {
+      setInspectionActionLoading(false);
+    }
+  };
+
+  const handleCancelRound = async () => {
+    if (!latestInspectionRound) return;
+    const confirmed = window.confirm("Cancel this inspection round?");
+    if (!confirmed) return;
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      await cancelInspectionRound(latestInspectionRound.id);
+      setActionMessage("Inspection round cancelled.");
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not cancel the round.");
+    } finally {
+      setInspectionActionLoading(false);
+    }
+  };
+
+  const openCreateTechnician = () => {
+    setEditingTechnicianId(null);
+    setTechnicianForm(emptyTechnicianForm);
+    setTechnicianDialogOpen(true);
+  };
+
+  const openEditTechnician = (technician: Technician) => {
+    setEditingTechnicianId(technician.id);
+    setTechnicianForm({
+      name: technician.name,
+      city: technician.city,
+      phone: technician.phone ?? "",
+      serviceTiers: technician.serviceTiers,
+      specialty: technician.specialty ?? "",
+    });
+    setTechnicianDialogOpen(true);
+  };
+
+  const toggleTechnicianTier = (tier: InspectionServiceTier) => {
+    setTechnicianForm((prev) => ({
+      ...prev,
+      serviceTiers: prev.serviceTiers.includes(tier)
+        ? prev.serviceTiers.filter((item) => item !== tier)
+        : [...prev.serviceTiers, tier],
+    }));
+  };
+
+  const handleSaveTechnician = async () => {
+    if (!technicianForm.name.trim() || !technicianForm.city.trim()) {
+      setDashboardError("Technician name and city are required.");
+      return;
+    }
+    setIsSavingTechnician(true);
+    setDashboardError("");
+    try {
+      const payload = {
+        name: technicianForm.name.trim(),
+        city: technicianForm.city.trim(),
+        phone: technicianForm.phone || undefined,
+        serviceTiers: technicianForm.serviceTiers,
+        specialty: technicianForm.specialty || undefined,
+      };
+      if (editingTechnicianId) {
+        await updateTechnician(editingTechnicianId, payload);
+        setActionMessage("Technician updated.");
+      } else {
+        await createTechnician(payload);
+        setActionMessage("Technician added.");
+      }
+      setTechnicianDialogOpen(false);
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not save technician.");
+    } finally {
+      setIsSavingTechnician(false);
+    }
+  };
+
+  const handleToggleTechnicianActive = async (technician: Technician) => {
+    try {
+      await updateTechnician(technician.id, { isActive: !technician.isActive });
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not update technician.");
+    }
+  };
+
+  const handleToggleVendorSuspended = async (vendor: Vendor) => {
+    const reason = window.prompt(
+      vendor.status === "SUSPENDED"
+        ? "Un-suspend this vendor? This lets them list cars again. Leave blank to confirm."
+        : "Reason for suspending this vendor? This immediately hides their active listings from the public marketplace."
+    );
+    if (reason === null) return;
+    setDashboardError("");
+    try {
+      if (vendor.status === "SUSPENDED") {
+        await unsuspendVendor(vendor.id);
+        setActionMessage("Vendor re-activated.");
+      } else {
+        await suspendVendor(vendor.id, reason);
+        setActionMessage("Vendor suspended - their listings are hidden from the public marketplace.");
+      }
+      await refreshPlatformData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not update vendor status.");
+    }
+  };
+
+  const handleToggleCarHidden = async (car: { id: string; hiddenByPlatform?: boolean }) => {
+    const reason = window.prompt(
+      car.hiddenByPlatform
+        ? "Un-hide this listing? Leave blank to confirm."
+        : "Reason for hiding this listing from the public marketplace?"
+    );
+    if (reason === null) return;
+    setDashboardError("");
+    try {
+      if (car.hiddenByPlatform) {
+        await unhidePlatformCar(car.id);
+        setActionMessage("Listing restored to the marketplace.");
+      } else {
+        await hidePlatformCar(car.id, reason);
+        setActionMessage("Listing hidden from the public marketplace.");
+      }
+      await refreshDashboardData();
+      await refreshPlatformData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not update listing visibility.");
+    }
+  };
+
+  const openReviewComplaint = (complaint: Complaint) => {
+    setReviewingComplaint(complaint);
+    setReviewNote("");
+    setComplaintDialogOpen(true);
+  };
+
+  const handleReviewComplaint = async (decision: "SUBSTANTIATED" | "DISMISSED" | "RESOLVED") => {
+    if (!reviewingComplaint) return;
+    if (decision === "SUBSTANTIATED" && !reviewNote.trim()) {
+      setDashboardError("Add a review note explaining the decision.");
+      return;
+    }
+    setIsReviewing(true);
+    setDashboardError("");
+    try {
+      await reviewComplaint(reviewingComplaint.id, {
+        decision,
+        note: reviewNote.trim() || undefined,
+      });
+      setComplaintDialogOpen(false);
+      setActionMessage(
+        decision === "SUBSTANTIATED"
+          ? "Complaint substantiated - vendor will be auto-flagged after 3+ substantiated complaints in 30 days."
+          : decision === "DISMISSED"
+            ? "Complaint dismissed."
+            : "Complaint marked resolved."
+      );
+      await refreshPlatformData();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not review the complaint.");
+    } finally {
+      setIsReviewing(false);
+    }
+  };
+
+  const handleFlagFraudulent = async (roundId: string) => {
+    const reason = window.prompt(
+      "Confirm this inspection file is fraudulent. The listing will be permanently hidden from the marketplace. Reason:"
+    );
+    if (!reason) return;
+    setInspectionActionLoading(true);
+    setDashboardError("");
+    try {
+      await flagRoundFraudulent(roundId, reason);
+      setActionMessage("Round flagged as fraudulent - the car listing has been hidden from the marketplace.");
+      await refreshInspectionCase();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not flag the round.");
+    } finally {
+      setInspectionActionLoading(false);
     }
   };
 
@@ -398,9 +842,13 @@ export default function Dashboard() {
     { id: "cars", label: "My Cars", icon: Car },
     { id: "inquiries", label: "Inquiries", icon: MessageSquare },
     { id: "deals", label: "Deals", icon: Handshake },
+    { id: "inspections", label: "Inspections", icon: ShieldCheck },
     { id: "favorites", label: "Favorites", icon: Heart },
     { id: "analytics", label: "Analytics", icon: TrendingUp },
     { id: "settings", label: "Settings", icon: Settings },
+    ...(isPlatformAdmin
+      ? [{ id: "vendors", label: "Marketplace Oversight", icon: ShieldAlert }]
+      : []),
   ];
 
   return (
@@ -686,6 +1134,11 @@ export default function Dashboard() {
                                 <div>
                                   <p className="text-white font-medium text-sm">{car.brand} {car.model}</p>
                                   <p className="text-white/50 text-xs">{car.year}</p>
+                                  {car.hiddenByPlatform && (
+                                    <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 inline-block mt-1" title={car.hiddenReason}>
+                                      Hidden by platform
+                                    </span>
+                                  )}
                                 </div>
                               </div>
                             </td>
@@ -716,11 +1169,31 @@ export default function Dashboard() {
                                 <Button
                                   variant="ghost"
                                   size="sm"
+                                  onClick={() => openInspectionDialog(car.id)}
+                                  title="Manage Inspection"
+                                  className="text-gold hover:bg-gold/10 h-8 w-8 p-0"
+                                >
+                                  <ShieldCheck className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
                                   onClick={() => openEditCar(car.id)}
                                   className="text-white/50 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
                                 >
                                   <Edit3 className="w-4 h-4" />
                                 </Button>
+                                {isPlatformAdmin && (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => handleToggleCarHidden(car)}
+                                    title={car.hiddenByPlatform ? "Restore to marketplace" : "Hide from marketplace"}
+                                    className="text-white/50 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+                                  >
+                                    {car.hiddenByPlatform ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
+                                  </Button>
+                                )}
                                 <Button
                                   variant="ghost"
                                   size="sm"
@@ -865,7 +1338,7 @@ export default function Dashboard() {
                                 {deal.commission.amount.toLocaleString()} {deal.commission.currency}
                                 <span className="text-white/30 text-xs">
                                   {" "}
-                                  ({deal.commissionType === "PERCENTAGE" ? `${deal.commissionValue}%` : "fixed"})
+                                  (flat {deal.commissionType === "PERCENTAGE" ? `${deal.commissionValue}%` : "rate"})
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-white/60 text-sm">
@@ -895,6 +1368,122 @@ export default function Dashboard() {
                         )}
                       </tbody>
                     </table>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Inspections Tab */}
+            {activeTab === "inspections" && (
+              <div className="space-y-8">
+                <div>
+                  <p className="text-white/50 text-sm mb-4">
+                    Every car needs an accepted maintenance file or certified inspection before it can be
+                    published as Available or Reserved. Click the shield icon on a car (in My Cars) to manage it,
+                    or pick one here.
+                  </p>
+                  <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gold/10">
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Car</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Action</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {dashboardCars.map((car) => (
+                            <tr key={car.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
+                              <td className="px-4 py-3 text-white font-medium text-sm">{car.brand} {car.model}</td>
+                              <td className="px-4 py-3">
+                                <span className={`text-xs px-2 py-1 rounded-full ${
+                                  car.status === "available" ? "bg-green-500/10 text-green-400" :
+                                  car.status === "reserved" ? "bg-orange-500/10 text-orange-400" :
+                                  "bg-red-500/10 text-red-400"
+                                }`}>
+                                  {car.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openInspectionDialog(car.id)}
+                                  className="text-gold hover:bg-gold/10"
+                                >
+                                  <ShieldCheck className="w-4 h-4 mr-2" />
+                                  Manage
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-white font-bold text-lg">Technician Partner Network</h3>
+                    <Button onClick={openCreateTechnician} className="bg-gold hover:bg-gold-light text-dark">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Add Technician
+                    </Button>
+                  </div>
+                  <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gold/10">
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Name</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">City</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Tiers</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Specialty</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Active</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {technicians.map((technician) => (
+                            <tr key={technician.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
+                              <td className="px-4 py-3 text-white font-medium text-sm">{technician.name}</td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{technician.city}</td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{technician.serviceTiers.join(", ") || "-"}</td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{technician.specialty || "-"}</td>
+                              <td className="px-4 py-3">
+                                <button
+                                  onClick={() => handleToggleTechnicianActive(technician)}
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    technician.isActive ? "bg-green-500/10 text-green-400" : "bg-white/10 text-white/40"
+                                  }`}
+                                >
+                                  {technician.isActive ? "Active" : "Inactive"}
+                                </button>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openEditTechnician(technician)}
+                                  className="text-white/50 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
+                                >
+                                  <Edit3 className="w-4 h-4" />
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                          {technicians.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-white/40 text-sm">
+                                No technicians yet. Add your first partner to start scheduling inspections.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -1034,6 +1623,181 @@ export default function Dashboard() {
                 </div>
               </div>
             )}
+
+            {/* Marketplace Oversight Tab (Platform Admin only) */}
+            {activeTab === "vendors" && (
+              <div className="space-y-8">
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-white font-bold text-lg">Vendors</h3>
+                      <p className="text-white/50 text-sm mt-1">
+                        Tiered oversight: vendors flagged for fraud are monitored; suspending a vendor hides
+                        their listings from the public marketplace.
+                      </p>
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-gold/10 text-gold">
+                      {vendors.length} vendors
+                    </span>
+                  </div>
+                  <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gold/10">
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Vendor</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Listings</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Open Complaints</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {vendors.map((vendor) => (
+                            <tr key={vendor.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
+                              <td className="px-4 py-3">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-gold/10 flex items-center justify-center text-gold font-bold text-xs">
+                                    {vendor.name.charAt(0)}
+                                  </div>
+                                  <div>
+                                    <p className="text-white font-medium text-sm">{vendor.name}</p>
+                                    {vendor.flaggedAt && (
+                                      <span className="text-[10px] px-1.5 py-0.5 rounded bg-orange-500/10 text-orange-400 inline-block mt-1" title={vendor.flaggedReason}>
+                                        Auto-flagged for fraud review
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{vendor.carCount}</td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    vendor.openComplaints > 0 ? "bg-orange-500/10 text-orange-400" : "bg-green-500/10 text-green-400"
+                                  }`}
+                                >
+                                  {vendor.openComplaints}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    vendor.status === "SUSPENDED" ? "bg-red-500/10 text-red-400" : "bg-green-500/10 text-green-400"
+                                  }`}
+                                >
+                                  {vendor.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => handleToggleVendorSuspended(vendor)}
+                                  className={vendor.status === "SUSPENDED"
+                                    ? "text-green-400 hover:bg-green-500/10"
+                                    : "text-red-400 hover:bg-red-500/10"}
+                                >
+                                  {vendor.status === "SUSPENDED" ? "Re-activate" : "Suspend"}
+                                </Button>
+                              </td>
+                            </tr>
+                          ))}
+                          {vendors.length === 0 && (
+                            <tr>
+                              <td colSpan={5} className="px-4 py-8 text-center text-white/40 text-sm">
+                                No vendors registered yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+
+                <div>
+                  <div className="flex items-center justify-between mb-4">
+                    <div>
+                      <h3 className="text-white font-bold text-lg">Customer Complaints</h3>
+                      <p className="text-white/50 text-sm mt-1">
+                        Substantiate a complaint to count toward auto-flagging. 3+ substantiated complaints
+                        in 30 days auto-flags the vendor.
+                      </p>
+                    </div>
+                    <span className="text-xs px-2 py-1 rounded-full bg-gold/10 text-gold">
+                      {complaints.filter((complaint) => complaint.status === "OPEN").length} open
+                    </span>
+                  </div>
+                  <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gold/10">
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Car</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Vendor</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Customer</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Complaint</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {complaints.map((complaint) => (
+                            <tr key={complaint.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
+                              <td className="px-4 py-3 text-white text-sm">
+                                {complaint.carBrand} {complaint.carModel}
+                              </td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{complaint.vendorName || "-"}</td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{complaint.customerName || "-"}</td>
+                              <td className="px-4 py-3 text-white/60 text-sm max-w-xs">
+                                <span className="line-clamp-2">{complaint.description}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span
+                                  className={`text-xs px-2 py-1 rounded-full ${
+                                    complaint.status === "OPEN"
+                                      ? "bg-blue-500/10 text-blue-400"
+                                      : complaint.status === "SUBSTANTIATED"
+                                        ? "bg-orange-500/10 text-orange-400"
+                                        : complaint.status === "RESOLVED"
+                                          ? "bg-green-500/10 text-green-400"
+                                          : "bg-white/10 text-white/60"
+                                  }`}
+                                >
+                                  {complaint.status}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {complaint.status === "OPEN" ? (
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => openReviewComplaint(complaint)}
+                                    className="text-gold hover:bg-gold/10"
+                                  >
+                                    Review
+                                  </Button>
+                                ) : (
+                                  <span className="text-white/30 text-xs">{complaint.reviewNote}</span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                          {complaints.length === 0 && (
+                            <tr>
+                              <td colSpan={6} className="px-4 py-8 text-center text-white/40 text-sm">
+                                No customer complaints yet.
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -1097,16 +1861,27 @@ export default function Dashboard() {
                 <SelectItem value="BOTH">BOTH</SelectItem>
               </SelectContent>
             </Select>
-            <Select value={carForm.status} onValueChange={(value) => setCarForm({ ...carForm, status: value })}>
-              <SelectTrigger className="bg-dark border-gold/20 text-white">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent className="bg-dark-card border-gold/20">
-                {["AVAILABLE", "RESERVED", "SOLD", "RENTED", "INACTIVE"].map((status) => (
-                  <SelectItem key={status} value={status}>{status}</SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+            <div>
+              <Select
+                value={carForm.status}
+                onValueChange={(value) => setCarForm({ ...carForm, status: value })}
+                disabled={!editingCarId}
+              >
+                <SelectTrigger className="bg-dark border-gold/20 text-white disabled:opacity-50">
+                  <SelectValue placeholder="Status" />
+                </SelectTrigger>
+                <SelectContent className="bg-dark-card border-gold/20">
+                  {["AVAILABLE", "RESERVED", "SOLD", "RENTED", "INACTIVE"].map((status) => (
+                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              {!editingCarId && (
+                <p className="text-white/30 text-xs mt-1">
+                  New cars start Inactive - add a maintenance inspection to publish them.
+                </p>
+              )}
+            </div>
             <Select value={carForm.condition} onValueChange={(value) => setCarForm({ ...carForm, condition: value })}>
               <SelectTrigger className="bg-dark border-gold/20 text-white">
                 <SelectValue placeholder="Condition" />
@@ -1243,26 +2018,9 @@ export default function Dashboard() {
               />
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                value={dealForm.commissionType}
-                onValueChange={(value) => setDealForm({ ...dealForm, commissionType: value })}
-              >
-                <SelectTrigger className="bg-dark border-gold/20 text-white">
-                  <SelectValue placeholder="Commission type" />
-                </SelectTrigger>
-                <SelectContent className="bg-dark-card border-gold/20">
-                  <SelectItem value="PERCENTAGE">PERCENTAGE</SelectItem>
-                  <SelectItem value="FIXED">FIXED</SelectItem>
-                </SelectContent>
-              </Select>
-              <Input
-                type="number"
-                placeholder={dealForm.commissionType === "PERCENTAGE" ? "Commission %" : "Commission USD"}
-                value={dealForm.commissionValue}
-                onChange={(event) => setDealForm({ ...dealForm, commissionValue: event.target.value })}
-                className="bg-dark border-gold/20 text-white"
-              />
+            <div className="rounded-lg border border-gold/20 bg-gold/5 px-4 py-3 text-sm text-white/60">
+              A flat platform commission applies to every deal. Commission is calculated automatically
+              from the final price.
             </div>
 
             <Textarea
@@ -1289,6 +2047,442 @@ export default function Dashboard() {
               {isSavingDeal ? "Saving..." : "Save Deal"}
             </Button>
           </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Inspection Management Dialog */}
+      <Dialog open={inspectionDialogOpen} onOpenChange={setInspectionDialogOpen}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Manage Inspection</DialogTitle>
+          </DialogHeader>
+
+          {isLoadingInspection ? (
+            <p className="text-white/50 text-sm py-8 text-center">Loading...</p>
+          ) : (
+            <div className="space-y-6">
+              {/* Round history */}
+              <div>
+                <h4 className="text-white/70 text-sm font-medium mb-2">History</h4>
+                <div className="space-y-2">
+                  {(inspectionCase?.rounds ?? []).map((round) => (
+                    <div key={round.id} className="bg-dark border border-gold/10 rounded-lg p-3">
+                      <div className="flex items-center justify-between">
+                        <span className="text-white text-sm font-medium">
+                          Round #{round.roundNumber} - {round.sourceType}
+                        </span>
+                        <span
+                          className={`text-xs px-2 py-1 rounded-full ${
+                            round.status === "FLAGGED_FRAUDULENT"
+                              ? "bg-red-500/10 text-red-400"
+                              : round.status === "CERTIFIED"
+                                ? "bg-green-500/10 text-green-400"
+                                : "bg-gold/10 text-gold"
+                          }`}
+                        >
+                          {round.status}
+                        </span>
+                      </div>
+                      <p className="text-white/40 text-xs mt-1">
+                        Requested by {round.requestedByRole} - {new Date(round.createdAt).toLocaleString()}
+                      </p>
+                      {round.templateData && (
+                        <p className="text-white/60 text-xs mt-2">Notes: {String(round.templateData.notes ?? "")}</p>
+                      )}
+                      {round.externalFileUrl && (
+                        <a
+                          href={round.externalFileUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="text-gold text-xs mt-2 inline-block underline"
+                        >
+                          View uploaded file
+                        </a>
+                      )}
+                      {round.overallVerdict && (
+                        <p className="text-white/60 text-xs mt-2">Verdict: {round.overallVerdict}</p>
+                      )}
+                      {round.findings.length > 0 && (
+                        <ul className="mt-2 space-y-1">
+                          {round.findings.map((finding) => (
+                            <li key={finding.id} className="text-xs text-orange-300">
+                              - {finding.description} ({finding.severity})
+                              {finding.estimatedRepairCost && (
+                                <> — est. {finding.estimatedRepairCost.amount} {finding.estimatedRepairCost.currency}</>
+                              )}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </div>
+                  ))}
+                  {(!inspectionCase || inspectionCase.rounds.length === 0) && (
+                    <p className="text-white/40 text-sm">No inspection history yet.</p>
+                  )}
+                </div>
+              </div>
+
+              {/* Contextual action panel */}
+              <div className="border-t border-gold/10 pt-4">
+                {isPlatformAdmin && latestInspectionRound?.status === "FILE_ACCEPTED" && (
+                  <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4">
+                    <p className="text-red-300 text-sm font-medium mb-2">
+                      Suspected fraudulent maintenance file? Flagging it permanently hides this listing from the marketplace.
+                    </p>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      disabled={inspectionActionLoading}
+                      onClick={() => handleFlagFraudulent(latestInspectionRound.id)}
+                      className="border-red-400/50 text-red-300 hover:bg-red-500/10"
+                    >
+                      <Flag className="w-4 h-4 mr-2" />
+                      {inspectionActionLoading ? "Flagging..." : "Flag as Fraudulent & Hide"}
+                    </Button>
+                  </div>
+                )}
+                {(!latestInspectionRound || ["FILE_ACCEPTED", "CERTIFIED", "CANCELLED"].includes(latestInspectionRound.status)) && (
+                  <div className="space-y-4">
+                    <h4 className="text-white/70 text-sm font-medium">
+                      {latestInspectionRound ? "Submit a new maintenance file" : "Submit maintenance file (required to publish)"}
+                    </h4>
+                    <div className="flex gap-2">
+                      <Button
+                        variant={inspectionSourceType === "TEMPLATE" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setInspectionSourceType("TEMPLATE")}
+                        className={inspectionSourceType === "TEMPLATE" ? "bg-gold text-dark" : "border-gold/30 text-gold"}
+                      >
+                        Fill in details
+                      </Button>
+                      <Button
+                        variant={inspectionSourceType === "EXTERNAL_FILE" ? "default" : "outline"}
+                        size="sm"
+                        onClick={() => setInspectionSourceType("EXTERNAL_FILE")}
+                        className={inspectionSourceType === "EXTERNAL_FILE" ? "bg-gold text-dark" : "border-gold/30 text-gold"}
+                      >
+                        Upload a file
+                      </Button>
+                    </div>
+                    {inspectionSourceType === "TEMPLATE" ? (
+                      <Textarea
+                        placeholder="Maintenance details (last service date, condition, known issues...)"
+                        value={inspectionTemplateNotes}
+                        onChange={(event) => setInspectionTemplateNotes(event.target.value)}
+                        className="bg-dark border-gold/20 text-white min-h-24"
+                      />
+                    ) : (
+                      <input
+                        type="file"
+                        accept="image/jpeg,image/png,image/webp,application/pdf"
+                        onChange={(event) => setInspectionFile(event.target.files?.[0] ?? null)}
+                        className="text-white/70 text-sm"
+                      />
+                    )}
+                    <Button
+                      onClick={handleSubmitSellerInspection}
+                      disabled={inspectionActionLoading}
+                      className="bg-gold hover:bg-gold-light text-dark font-bold"
+                    >
+                      {inspectionActionLoading ? "Submitting..." : "Submit"}
+                    </Button>
+
+                    <div className="pt-2 border-t border-gold/10">
+                      <p className="text-white/50 text-xs mb-2">Or request a fresh technician inspection on behalf of:</p>
+                      <div className="flex gap-2">
+                        {(["SELLER", "BUYER", "RENTER"] as const).map((role) => (
+                          <Button
+                            key={role}
+                            variant="outline"
+                            size="sm"
+                            disabled={inspectionActionLoading}
+                            onClick={() => handleRequestTechnicianVisit(role)}
+                            className="border-gold/30 text-gold hover:bg-gold/10"
+                          >
+                            {role}
+                          </Button>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {latestInspectionRound?.status === "ESCALATED_TO_TECHNICIAN" && (
+                  <div className="space-y-4">
+                    <h4 className="text-white/70 text-sm font-medium">Schedule technician visit</h4>
+                    <Select value={scheduleTechnicianId} onValueChange={setScheduleTechnicianId}>
+                      <SelectTrigger className="bg-dark border-gold/20 text-white">
+                        <SelectValue placeholder="Choose a technician" />
+                      </SelectTrigger>
+                      <SelectContent className="bg-dark-card border-gold/20">
+                        {technicians.filter((t) => t.isActive).map((technician) => (
+                          <SelectItem key={technician.id} value={technician.id}>
+                            {technician.name} - {technician.city}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Input
+                      type="datetime-local"
+                      value={scheduleDateTime}
+                      onChange={(event) => setScheduleDateTime(event.target.value)}
+                      className="bg-dark border-gold/20 text-white"
+                    />
+                    <Button
+                      onClick={handleScheduleRound}
+                      disabled={inspectionActionLoading}
+                      className="bg-gold hover:bg-gold-light text-dark font-bold"
+                    >
+                      {inspectionActionLoading ? "Scheduling..." : "Schedule"}
+                    </Button>
+                  </div>
+                )}
+
+                {latestInspectionRound?.status === "SCHEDULED" && (
+                  <Button
+                    onClick={handleStartRound}
+                    disabled={inspectionActionLoading}
+                    className="bg-gold hover:bg-gold-light text-dark font-bold"
+                  >
+                    {inspectionActionLoading ? "Starting..." : "Start Inspection"}
+                  </Button>
+                )}
+
+                {latestInspectionRound?.status === "IN_PROGRESS" && (
+                  <div className="space-y-4">
+                    <h4 className="text-white/70 text-sm font-medium">Submit report</h4>
+                    <Input
+                      placeholder="Overall verdict (e.g. Good, Fair, Poor)"
+                      value={reportVerdict}
+                      onChange={(event) => setReportVerdict(event.target.value)}
+                      className="bg-dark border-gold/20 text-white"
+                    />
+                    <div className="grid grid-cols-2 gap-4">
+                      <Input
+                        type="number"
+                        placeholder="Price USD"
+                        value={reportPriceAmount}
+                        onChange={(event) => setReportPriceAmount(event.target.value)}
+                        className="bg-dark border-gold/20 text-white"
+                      />
+                      <Select value={reportPaidBy} onValueChange={(value) => setReportPaidBy(value as InspectionPaidBy)}>
+                        <SelectTrigger className="bg-dark border-gold/20 text-white">
+                          <SelectValue placeholder="Paid by" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-dark-card border-gold/20">
+                          {(["SELLER", "BUYER", "RENTER", "DRIVEX"] as const).map((option) => (
+                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+
+                    <div className="space-y-3">
+                      <div className="flex items-center justify-between">
+                        <p className="text-white/50 text-xs">Findings (optional)</p>
+                        <Button variant="ghost" size="sm" onClick={addFindingRow} className="text-gold hover:bg-gold/10">
+                          <Plus className="w-3 h-3 mr-1" /> Add finding
+                        </Button>
+                      </div>
+                      {reportFindings.map((finding, index) => (
+                        <div key={index} className="flex gap-2 items-start bg-dark border border-gold/10 rounded-lg p-2">
+                          <Input
+                            placeholder="Description"
+                            value={finding.description}
+                            onChange={(event) => updateFindingRow(index, { description: event.target.value })}
+                            className="bg-dark border-gold/20 text-white text-sm"
+                          />
+                          <Select
+                            value={finding.severity}
+                            onValueChange={(value) => updateFindingRow(index, { severity: value as InspectionFindingSeverity })}
+                          >
+                            <SelectTrigger className="bg-dark border-gold/20 text-white w-36">
+                              <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent className="bg-dark-card border-gold/20">
+                              {(["MINOR", "MODERATE", "SEVERE", "SAFETY_CRITICAL"] as const).map((option) => (
+                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                              ))}
+                            </SelectContent>
+                          </Select>
+                          <Input
+                            type="number"
+                            placeholder="Cost USD"
+                            value={finding.costAmount}
+                            onChange={(event) => updateFindingRow(index, { costAmount: event.target.value })}
+                            className="bg-dark border-gold/20 text-white text-sm w-28"
+                          />
+                          <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => removeFindingRow(index)}
+                            className="text-red-400 hover:bg-red-500/10 h-9 w-9 p-0 shrink-0"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+
+                    <Button
+                      onClick={handleSubmitReport}
+                      disabled={inspectionActionLoading}
+                      className="bg-gold hover:bg-gold-light text-dark font-bold"
+                    >
+                      {inspectionActionLoading ? "Submitting..." : "Submit Report"}
+                    </Button>
+                  </div>
+                )}
+
+                {latestInspectionRound?.status === "REPORT_SUBMITTED" && (
+                  <Button
+                    onClick={handleCertifyRound}
+                    disabled={inspectionActionLoading}
+                    className="bg-gold hover:bg-gold-light text-dark font-bold"
+                  >
+                    {inspectionActionLoading ? "Certifying..." : "Certify Inspection"}
+                  </Button>
+                )}
+
+                {latestInspectionRound && !["CERTIFIED", "CANCELLED"].includes(latestInspectionRound.status) && (
+                  <Button
+                    variant="ghost"
+                    onClick={handleCancelRound}
+                    disabled={inspectionActionLoading}
+                    className="text-red-400 hover:bg-red-500/10 mt-3"
+                  >
+                    Cancel This Round
+                  </Button>
+                )}
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      {/* Technician Dialog */}
+      <Dialog open={technicianDialogOpen} onOpenChange={setTechnicianDialogOpen}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">
+              {editingTechnicianId ? "Edit Technician" : "Add Technician"}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="grid grid-cols-1 gap-4">
+            <Input
+              placeholder="Name"
+              value={technicianForm.name}
+              onChange={(event) => setTechnicianForm({ ...technicianForm, name: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <div className="grid grid-cols-2 gap-4">
+              <Input
+                placeholder="City"
+                value={technicianForm.city}
+                onChange={(event) => setTechnicianForm({ ...technicianForm, city: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+              <Input
+                placeholder="Phone (optional)"
+                value={technicianForm.phone}
+                onChange={(event) => setTechnicianForm({ ...technicianForm, phone: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+            </div>
+            <Input
+              placeholder="Specialty (e.g. mechanical, electrical, body)"
+              value={technicianForm.specialty}
+              onChange={(event) => setTechnicianForm({ ...technicianForm, specialty: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <div>
+              <p className="text-white/50 text-xs mb-2">Service tiers</p>
+              <div className="flex gap-2">
+                {(["QUICK", "COMPREHENSIVE"] as const).map((tier) => (
+                  <Button
+                    key={tier}
+                    type="button"
+                    variant={technicianForm.serviceTiers.includes(tier) ? "default" : "outline"}
+                    size="sm"
+                    onClick={() => toggleTechnicianTier(tier)}
+                    className={technicianForm.serviceTiers.includes(tier) ? "bg-gold text-dark" : "border-gold/30 text-gold"}
+                  >
+                    {tier}
+                  </Button>
+                ))}
+              </div>
+            </div>
+          </div>
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setTechnicianDialogOpen(false)}
+              className="border-gold/30 text-gold hover:bg-gold/10"
+            >
+              Cancel
+            </Button>
+            <Button
+              onClick={handleSaveTechnician}
+              disabled={isSavingTechnician}
+              className="bg-gold hover:bg-gold-light text-dark font-bold"
+            >
+              {isSavingTechnician ? "Saving..." : "Save Technician"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={complaintDialogOpen} onOpenChange={setComplaintDialogOpen}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-lg">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Review Complaint</DialogTitle>
+          </DialogHeader>
+          {reviewingComplaint && (
+            <div className="space-y-4">
+              <div className="rounded-lg bg-dark border border-gold/10 p-4 space-y-2">
+                <p className="text-white font-medium text-sm">
+                  {reviewingComplaint.carBrand} {reviewingComplaint.carModel}
+                  <span className="text-white/40 font-normal"> — {reviewingComplaint.vendorName}</span>
+                </p>
+                <p className="text-white/40 text-xs">
+                  Submitted by {reviewingComplaint.customerName || "customer"} on{" "}
+                  {new Date(reviewingComplaint.createdAt).toLocaleString()}
+                </p>
+                <p className="text-white/70 text-sm">{reviewingComplaint.description}</p>
+              </div>
+              <Textarea
+                placeholder="Review note (required when substantiating)"
+                value={reviewNote}
+                onChange={(event) => setReviewNote(event.target.value)}
+                className="bg-dark border-gold/20 text-white min-h-20"
+              />
+              <div className="flex flex-wrap justify-end gap-3 pt-2">
+                <Button
+                  variant="outline"
+                  onClick={() => handleReviewComplaint("DISMISSED")}
+                  disabled={isReviewing}
+                  className="border-white/20 text-white/70 hover:bg-white/10"
+                >
+                  Dismiss
+                </Button>
+                <Button
+                  variant="outline"
+                  onClick={() => handleReviewComplaint("SUBSTANTIATED")}
+                  disabled={isReviewing}
+                  className="border-orange-400/50 text-orange-300 hover:bg-orange-500/10"
+                >
+                  Substantiate
+                </Button>
+                <Button
+                  onClick={() => handleReviewComplaint("RESOLVED")}
+                  disabled={isReviewing}
+                  className="bg-gold hover:bg-gold-light text-dark font-bold"
+                >
+                  {isReviewing ? "Saving..." : "Mark Resolved"}
+                </Button>
+              </div>
+            </div>
+          )}
         </DialogContent>
       </Dialog>
     </div>

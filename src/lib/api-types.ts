@@ -5,7 +5,7 @@ export type CarCondition = "NEW" | "USED";
 export type CarStatus = "AVAILABLE" | "RESERVED" | "SOLD" | "RENTED" | "INACTIVE";
 export type LeadIntent = "BUY" | "RENT";
 export type LeadStatus = "NEW" | "CONTACTED" | "NEGOTIATING" | "APPROVED" | "REJECTED" | "CLOSED";
-export type AdminRole = "OWNER" | "STAFF";
+export type AdminRole = "OWNER" | "STAFF" | "PLATFORM_ADMIN";
 
 export interface Money {
   amount: number;
@@ -44,6 +44,10 @@ export interface ApiCar {
     horsepower?: number;
   };
   description?: string;
+  vendorId?: string;
+  vendorName?: string;
+  hiddenByPlatform?: boolean;
+  hiddenReason?: string;
   createdAt: string;
   updatedAt: string;
   deletedAt?: string | null;
@@ -123,6 +127,7 @@ export interface AdminProfile {
   email: string;
   fullName?: string;
   role: AdminRole;
+  vendorId?: string | null;
 }
 
 export interface AuthTokenResponse {
@@ -190,7 +195,110 @@ export interface CreateDealRequest {
   carId: string;
   type: "SALE" | "RENT";
   finalPrice: Money;
-  commissionType: "PERCENTAGE" | "FIXED";
-  commissionValue: number;
+  commissionType?: "PERCENTAGE" | "FIXED";
+  commissionValue?: number;
   notes?: string;
+}
+
+export type InspectionRoundStatus =
+  | "OPENED"
+  | "INTERNAL_REVIEW"
+  | "FILE_ACCEPTED"
+  | "ESCALATED_TO_TECHNICIAN"
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "REPORT_SUBMITTED"
+  | "CERTIFIED"
+  | "CANCELLED"
+  | "FLAGGED_FRAUDULENT";
+
+export type InspectionRequesterRole = "SELLER" | "BUYER" | "RENTER";
+export type InspectionSourceType = "EXTERNAL_FILE" | "TEMPLATE" | "DRIVEX_INSPECTION";
+export type InspectionFindingSeverity = "MINOR" | "MODERATE" | "SEVERE" | "SAFETY_CRITICAL";
+export type InspectionServiceTier = "QUICK" | "COMPREHENSIVE";
+export type InspectionPaidBy = "SELLER" | "BUYER" | "RENTER" | "DRIVEX";
+
+export interface InspectionFinding {
+  id: string;
+  description: string;
+  severity: InspectionFindingSeverity;
+  estimatedRepairCost?: Money;
+  createdAt: string;
+}
+
+export interface InspectionRound {
+  id: string;
+  roundNumber: number;
+  requestedByRole: InspectionRequesterRole;
+  requestedByAdminId?: string;
+  requestedByCustomerId?: string;
+  sourceType: InspectionSourceType;
+  status: InspectionRoundStatus;
+  templateData?: Record<string, unknown>;
+  externalFileUrl?: string;
+  technicianId?: string;
+  scheduledAt?: string;
+  completedAt?: string;
+  overallVerdict?: string;
+  price?: Money;
+  paidBy?: InspectionPaidBy;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+  findings: InspectionFinding[];
+}
+
+export interface InspectionCase {
+  id?: string;
+  carId: string;
+  createdAt?: string;
+  updatedAt?: string;
+  rounds: InspectionRound[];
+}
+
+export interface Technician {
+  id: string;
+  name: string;
+  city: string;
+  phone?: string;
+  serviceTiers: InspectionServiceTier[];
+  specialty?: string;
+  isActive: boolean;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type VendorStatus = "ACTIVE" | "SUSPENDED";
+
+export interface Vendor {
+  id: string;
+  name: string;
+  status: VendorStatus;
+  suspendedAt?: string;
+  suspendedReason?: string;
+  flaggedAt?: string;
+  flaggedReason?: string;
+  carCount: number;
+  openComplaints: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export type ComplaintStatus = "OPEN" | "SUBSTANTIATED" | "DISMISSED" | "RESOLVED";
+
+export interface Complaint {
+  id: string;
+  carId: string;
+  carBrand?: string;
+  carModel?: string;
+  vendorId?: string;
+  vendorName?: string;
+  customerId?: string;
+  customerName?: string;
+  description: string;
+  status: ComplaintStatus;
+  reviewedById?: string;
+  reviewedAt?: string;
+  reviewNote?: string;
+  createdAt: string;
 }

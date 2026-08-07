@@ -1,4 +1,4 @@
-import { apiFetch, setCustomerAuthTokens } from "./api";
+import { apiFetch, setCustomerAuthTokens, setCustomerSessionProfile } from "./api";
 import { toQueryString } from "./api";
 import type {
   ApiCar,
@@ -6,6 +6,8 @@ import type {
   CustomerProfile,
   CreateLeadRequest,
   FiltersMetaResponse,
+  InspectionCase,
+  InspectionRound,
   LeadCreatedResponse,
   LeadResponse,
   PaginatedResponse,
@@ -57,7 +59,7 @@ export async function registerCustomer(payload: {
     body: JSON.stringify(payload),
   });
   setCustomerAuthTokens(response.accessToken, response.refreshToken);
-  localStorage.setItem("drive_x_customer", JSON.stringify(response.customer));
+  setCustomerSessionProfile(response.customer);
   return response;
 }
 
@@ -67,7 +69,7 @@ export async function loginCustomer(email: string, password: string) {
     body: JSON.stringify({ email, password }),
   });
   setCustomerAuthTokens(response.accessToken, response.refreshToken);
-  localStorage.setItem("drive_x_customer", JSON.stringify(response.customer));
+  setCustomerSessionProfile(response.customer);
   return response;
 }
 
@@ -105,5 +107,17 @@ export function updateMyProfile(payload: { fullName?: string; phone?: string }) 
     method: "PATCH",
     body: JSON.stringify(payload),
     auth: "customer",
+  });
+}
+
+export function getCarInspection(carId: string) {
+  return apiFetch<InspectionCase>(`/v1/public/cars/${carId}/inspection`);
+}
+
+export function requestCarInspection(carId: string, payload: { intent: "BUY" | "RENT"; notes?: string }) {
+  return apiFetch<InspectionRound>(`/v1/public/cars/${carId}/inspection/request-technician`, {
+    method: "POST",
+    auth: "customer",
+    body: JSON.stringify(payload),
   });
 }

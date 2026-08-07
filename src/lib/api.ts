@@ -4,6 +4,19 @@ const ACCESS_TOKEN_KEY = "drive_x_access_token";
 const REFRESH_TOKEN_KEY = "drive_x_refresh_token";
 const CUSTOMER_ACCESS_TOKEN_KEY = "drive_x_customer_access_token";
 const CUSTOMER_REFRESH_TOKEN_KEY = "drive_x_customer_refresh_token";
+const ADMIN_PROFILE_KEY = "drive_x_auth";
+const CUSTOMER_PROFILE_KEY = "drive_x_customer";
+
+const SESSION_KEYS = [
+  ACCESS_TOKEN_KEY,
+  REFRESH_TOKEN_KEY,
+  CUSTOMER_ACCESS_TOKEN_KEY,
+  CUSTOMER_REFRESH_TOKEN_KEY,
+  ADMIN_PROFILE_KEY,
+  CUSTOMER_PROFILE_KEY,
+];
+
+SESSION_KEYS.forEach((key) => localStorage.removeItem(key));
 
 export class ApiError extends Error {
   status: number;
@@ -20,41 +33,69 @@ export class ApiError extends Error {
 }
 
 export function getAccessToken() {
-  return localStorage.getItem(ACCESS_TOKEN_KEY);
+  return sessionStorage.getItem(ACCESS_TOKEN_KEY);
 }
 
 export function getRefreshToken() {
-  return localStorage.getItem(REFRESH_TOKEN_KEY);
+  return sessionStorage.getItem(REFRESH_TOKEN_KEY);
 }
 
 export function getCustomerAccessToken() {
-  return localStorage.getItem(CUSTOMER_ACCESS_TOKEN_KEY);
+  return sessionStorage.getItem(CUSTOMER_ACCESS_TOKEN_KEY);
 }
 
 export function getCustomerRefreshToken() {
-  return localStorage.getItem(CUSTOMER_REFRESH_TOKEN_KEY);
+  return sessionStorage.getItem(CUSTOMER_REFRESH_TOKEN_KEY);
 }
 
 export function setAuthTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
+  localStorage.removeItem(ACCESS_TOKEN_KEY);
+  localStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.setItem(ACCESS_TOKEN_KEY, accessToken);
+  sessionStorage.setItem(REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export function setCustomerAuthTokens(accessToken: string, refreshToken: string) {
-  localStorage.setItem(CUSTOMER_ACCESS_TOKEN_KEY, accessToken);
-  localStorage.setItem(CUSTOMER_REFRESH_TOKEN_KEY, refreshToken);
+  localStorage.removeItem(CUSTOMER_ACCESS_TOKEN_KEY);
+  localStorage.removeItem(CUSTOMER_REFRESH_TOKEN_KEY);
+  sessionStorage.setItem(CUSTOMER_ACCESS_TOKEN_KEY, accessToken);
+  sessionStorage.setItem(CUSTOMER_REFRESH_TOKEN_KEY, refreshToken);
 }
 
 export function clearAuthTokens() {
+  sessionStorage.removeItem(ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(ADMIN_PROFILE_KEY);
   localStorage.removeItem(ACCESS_TOKEN_KEY);
   localStorage.removeItem(REFRESH_TOKEN_KEY);
-  localStorage.removeItem("drive_x_auth");
+  localStorage.removeItem(ADMIN_PROFILE_KEY);
 }
 
 export function clearCustomerAuthTokens() {
+  sessionStorage.removeItem(CUSTOMER_ACCESS_TOKEN_KEY);
+  sessionStorage.removeItem(CUSTOMER_REFRESH_TOKEN_KEY);
+  sessionStorage.removeItem(CUSTOMER_PROFILE_KEY);
   localStorage.removeItem(CUSTOMER_ACCESS_TOKEN_KEY);
   localStorage.removeItem(CUSTOMER_REFRESH_TOKEN_KEY);
-  localStorage.removeItem("drive_x_customer");
+  localStorage.removeItem(CUSTOMER_PROFILE_KEY);
+}
+
+export function setAdminSessionProfile(profile: { email: string; name: string; role: string }) {
+  localStorage.removeItem(ADMIN_PROFILE_KEY);
+  sessionStorage.setItem(ADMIN_PROFILE_KEY, JSON.stringify(profile));
+}
+
+export function getAdminSessionProfile() {
+  return sessionStorage.getItem(ADMIN_PROFILE_KEY);
+}
+
+export function setCustomerSessionProfile(profile: unknown) {
+  localStorage.removeItem(CUSTOMER_PROFILE_KEY);
+  sessionStorage.setItem(CUSTOMER_PROFILE_KEY, JSON.stringify(profile));
+}
+
+export function getCustomerSessionProfile() {
+  return sessionStorage.getItem(CUSTOMER_PROFILE_KEY);
 }
 
 export function resolveAssetUrl(url?: string) {
@@ -120,7 +161,7 @@ async function refreshCustomerAccessToken() {
   const tokens = await response.json();
   setCustomerAuthTokens(tokens.accessToken, tokens.refreshToken);
   if (tokens.customer) {
-    localStorage.setItem("drive_x_customer", JSON.stringify(tokens.customer));
+    setCustomerSessionProfile(tokens.customer);
   }
   return true;
 }

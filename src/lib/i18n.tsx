@@ -18,6 +18,8 @@ const messages = {
     logout: "Logout",
     customer: "Customer",
     admin: "Admin",
+    seller: "Seller",
+    platformAdmin: "Platform Admin",
 
     // --- Home Page ---
     premiumCarMarketplace: "Premium Car Marketplace",
@@ -176,10 +178,10 @@ const messages = {
     welcomeBackTo: "Welcome Back to",
     welcomeBackHighlight: "Excellence",
     customerLoginDesc: "Access your account to manage your favorites, track inquiries, and explore our exclusive inventory.",
-    adminLoginDesc: "Sign in to manage your cars, leads, deals, and dashboard analytics.",
+    adminLoginDesc: "Sign in as a seller to manage your listings, leads, deals, and dashboard analytics.",
     trustedByClients: "Trusted by 1,800+ clients",
     premiumMarketplace: "Premium car marketplace",
-    signInToAdmin: "Sign in to the admin dashboard",
+    signInToAdmin: "Sign in to the seller dashboard",
     dontHaveAccount: "Don't have an account?",
     createOne: "Create one",
     rememberMe: "Remember me",
@@ -277,6 +279,8 @@ const messages = {
     logout: "تسجيل الخروج",
     customer: "عميل",
     admin: "أدمن",
+    seller: "بائع",
+    platformAdmin: "أدمن المنصة",
 
     // --- Home Page ---
     premiumCarMarketplace: "سوق السيارات الفاخرة",
@@ -435,10 +439,10 @@ const messages = {
     welcomeBackTo: "مرحباً بعودتك إلى",
     welcomeBackHighlight: "Drive X",
     customerLoginDesc: "ادخل حسابك لإدارة المفضلة، وتتبع الاستفسارات، واستكشاف مجموعتنا الحصرية.",
-    adminLoginDesc: "سجّل الدخول لإدارة السيارات، والعروض، وصفقات، وتحليلات لوحة التحكم.",
+    adminLoginDesc: "سجّل الدخول كبائع لإدارة سياراتك، والاستفسارات، والصفقات، وتحليلات لوحة التحكم.",
     trustedByClients: "موثوق من قبل 1,800+ عميل",
     premiumMarketplace: "سوق سيارات فاخر",
-    signInToAdmin: "سجّل الدخول إلى لوحة تحكم الأدمن",
+    signInToAdmin: "سجّل الدخول إلى لوحة تحكم البائع",
     dontHaveAccount: "ليس لديك حساب؟",
     createOne: "أنشئ واحداً",
     rememberMe: "تذكرني",
@@ -523,7 +527,7 @@ const messages = {
   },
 } as const;
 
-type MessageKey = keyof typeof messages.en;
+export type MessageKey = keyof typeof messages.en;
 
 interface I18nContextValue {
   language: Language;

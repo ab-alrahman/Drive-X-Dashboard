@@ -4,6 +4,7 @@ import Footer from './components/Footer'
 import Home from './pages/Home'
 import Login from './pages/Login'
 import Register from './pages/Register'
+import VendorRegister from './pages/VendorRegister'
 import Inventory from './pages/Inventory'
 import CarDetail from './pages/CarDetail'
 import Dashboard from './pages/Dashboard'
@@ -23,6 +24,7 @@ export default function App() {
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
+          <Route path="/vendor-register" element={<VendorRegister />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/car/:id" element={<CarDetail />} />
           <Route path="/dashboard" element={<RequireAuth role="admin"><Dashboard /></RequireAuth>} />

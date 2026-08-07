@@ -11,7 +11,12 @@ import {
   Heart,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { clearCustomerAuthTokens, clearAuthTokens } from "@/lib/api";
+import {
+  clearCustomerAuthTokens,
+  clearAuthTokens,
+  getAdminSessionProfile,
+  getCustomerSessionProfile,
+} from "@/lib/api";
 import { useI18n } from "@/lib/i18n";
 import {
   DropdownMenu,
@@ -24,40 +29,71 @@ import {
 export default function Navbar() {
   const [isScrolled, setIsScrolled] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [isLoggedIn, setIsLoggedIn] = useState(false);
-  const [isAdminLoggedIn, setIsAdminLoggedIn] = useState(false);
-  const [accountLabel, setAccountLabel] = useState("Customer");
   const { language, setLanguage, t } = useI18n();
   const location = useLocation();
   const navigate = useNavigate();
+
+  const session = (() => {
+    try {
+      const auth = getAdminSessionProfile();
+      const customer = getCustomerSessionProfile();
+
+      if (auth) {
+        const parsed = JSON.parse(auth) as { name?: string; role?: string };
+        return {
+          isLoggedIn: true,
+          isAdminLoggedIn: true,
+          accountLabel: parsed.name ?? "Seller User",
+          role: parsed.role,
+        };
+      }
+
+      if (customer) {
+        const parsed = JSON.parse(customer) as { fullName?: string };
+        return {
+          isLoggedIn: true,
+          isAdminLoggedIn: false,
+          accountLabel: parsed.fullName ?? "Customer",
+          role: "CUSTOMER",
+        };
+      }
+    } catch {
+      return {
+        isLoggedIn: false,
+        isAdminLoggedIn: false,
+        accountLabel: "Customer",
+        role: undefined,
+      };
+    }
+
+    return {
+      isLoggedIn: false,
+      isAdminLoggedIn: false,
+      accountLabel: "Customer",
+      role: undefined,
+    };
+  })();
+
+  const accountTypeLabel = session.role === "PLATFORM_ADMIN"
+    ? t("platformAdmin")
+    : session.isAdminLoggedIn
+      ? t("seller")
+      : t("customer");
+  const nextLanguage = language === "en" ? "ar" : "en";
+  const languageLabel = nextLanguage.toUpperCase();
 
   useEffect(() => {
     const handleScroll = () => {
       setIsScrolled(window.scrollY > 50);
     };
+
     window.addEventListener("scroll", handleScroll);
     return () => window.removeEventListener("scroll", handleScroll);
   }, []);
 
-  useEffect(() => {
-    const auth = localStorage.getItem("drive_x_auth");
-    const customer = localStorage.getItem("drive_x_customer");
-    setIsAdminLoggedIn(!!auth);
-    setIsLoggedIn(!!auth || !!customer);
-    if (auth) {
-      const parsed = JSON.parse(auth);
-      setAccountLabel(parsed.name ?? "Admin User");
-    } else if (customer) {
-      const parsed = JSON.parse(customer);
-      setAccountLabel(parsed.fullName ?? "Customer");
-    }
-  }, [location]);
-
   const handleLogout = () => {
     clearAuthTokens();
     clearCustomerAuthTokens();
-    setIsLoggedIn(false);
-    setIsAdminLoggedIn(false);
     navigate("/");
   };
 
@@ -80,7 +116,6 @@ export default function Navbar() {
     >
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex items-center justify-between h-20">
-          {/* Logo */}
           <Link to="/" className="flex items-center gap-3 group">
             <div className="w-10 h-10 rounded-full bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center shadow-glow group-hover:shadow-glow-lg transition-shadow duration-300">
               <Car className="w-5 h-5 text-dark font-bold" />
@@ -95,7 +130,6 @@ export default function Navbar() {
             </div>
           </Link>
 
-          {/* Desktop Navigation */}
           <div className="hidden md:flex items-center gap-1">
             {navLinks.map((link) => (
               <Link
@@ -112,7 +146,6 @@ export default function Navbar() {
             ))}
           </div>
 
-          {/* Right Section */}
           <div className="hidden md:flex items-center gap-3">
             <Link to="/inventory">
               <Button
@@ -124,16 +157,17 @@ export default function Navbar() {
                 {t("search")}
               </Button>
             </Link>
+
             <Button
-              variant="ghost"
+              variant="outline"
               size="sm"
-              onClick={() => setLanguage(language === "en" ? "ar" : "en")}
-              className="text-white/70 hover:text-gold hover:bg-gold/10"
+              onClick={() => setLanguage(nextLanguage)}
+              className="min-w-12 border-gold/30 text-gold hover:bg-gold/10"
             >
-              {language === "en" ? "العربية" : "English"}
+              {languageLabel}
             </Button>
 
-            {isLoggedIn ? (
+            {session.isLoggedIn ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -153,12 +187,12 @@ export default function Navbar() {
                     </div>
                     <div>
                       <p className="text-sm font-medium text-white">
-                        {accountLabel}
+                        {session.accountLabel}
                       </p>
-                      <p className="text-xs text-gold">{isAdminLoggedIn ? t("admin") : t("customer")}</p>
+                      <p className="text-xs text-gold">{accountTypeLabel}</p>
                     </div>
                   </div>
-                  {isAdminLoggedIn && (
+                  {session.isAdminLoggedIn && (
                     <DropdownMenuItem
                       onClick={() => navigate("/dashboard")}
                       className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
@@ -167,7 +201,7 @@ export default function Navbar() {
                       {t("dashboard")}
                     </DropdownMenuItem>
                   )}
-                  {!isAdminLoggedIn && isLoggedIn && (
+                  {!session.isAdminLoggedIn && session.isLoggedIn && (
                     <DropdownMenuItem
                       onClick={() => navigate("/my-dashboard")}
                       className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
@@ -216,7 +250,6 @@ export default function Navbar() {
             )}
           </div>
 
-          {/* Mobile Menu Button */}
           <button
             className="md:hidden text-white p-2"
             onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -229,7 +262,6 @@ export default function Navbar() {
           </button>
         </div>
 
-        {/* Mobile Menu */}
         {mobileMenuOpen && (
           <div className="md:hidden bg-dark-card/95 backdrop-blur-md border-t border-gold/20 py-4">
             <div className="flex flex-col gap-2">
@@ -247,19 +279,31 @@ export default function Navbar() {
                   {link.name}
                 </Link>
               ))}
+
+              <div className="px-4 pt-2">
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setLanguage(nextLanguage)}
+                  className="w-full border-gold/30 text-gold hover:bg-gold/10"
+                >
+                  {languageLabel}
+                </Button>
+              </div>
+
               <div className="border-t border-gold/20 pt-3 mt-2">
-                {isLoggedIn ? (
+                {session.isLoggedIn ? (
                   <>
-                    {isAdminLoggedIn && (
+                    {session.isAdminLoggedIn && (
                       <Link
                         to="/dashboard"
                         onClick={() => setMobileMenuOpen(false)}
                         className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
                       >
-                      <LayoutDashboard className="w-4 h-4" /> {t("dashboard")}
+                        <LayoutDashboard className="w-4 h-4" /> {t("dashboard")}
                       </Link>
                     )}
-                    {!isAdminLoggedIn && isLoggedIn && (
+                    {!session.isAdminLoggedIn && session.isLoggedIn && (
                       <Link
                         to="/my-dashboard"
                         onClick={() => setMobileMenuOpen(false)}

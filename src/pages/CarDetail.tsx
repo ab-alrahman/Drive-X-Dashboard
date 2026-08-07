@@ -16,14 +16,27 @@ import {
   Mail,
   Check,
   Shield,
+  ShieldCheck,
   Clock,
   Award,
   MessageSquare,
+  FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getCustomerAccessToken } from "@/lib/api";
 import { mapApiCarToView, mapApiCarsToView, type CarView } from "@/lib/car-mapper";
-import { addFavoriteCar, createLead, getFavoriteCars, getPublicCar, getPublicCars, removeFavoriteCar } from "@/lib/public-api";
+import {
+  addFavoriteCar,
+  createLead,
+  getCarInspection,
+  getFavoriteCars,
+  getPublicCar,
+  getPublicCars,
+  removeFavoriteCar,
+  requestCarInspection,
+} from "@/lib/public-api";
+import type { InspectionCase } from "@/lib/api-types";
+import { submitCarComplaint } from "@/lib/vendors-api";
 import {
   Dialog,
   DialogContent,
@@ -49,6 +62,17 @@ export default function CarDetail() {
   const [submitMessage, setSubmitMessage] = useState("");
   const [submitError, setSubmitError] = useState("");
   const [favoriteMessage, setFavoriteMessage] = useState("");
+  const [inspectionCase, setInspectionCase] = useState<InspectionCase | null>(null);
+  const [showRequestInspection, setShowRequestInspection] = useState(false);
+  const [inspectionIntent, setInspectionIntent] = useState<"BUY" | "RENT">("BUY");
+  const [inspectionNotes, setInspectionNotes] = useState("");
+  const [isRequestingInspection, setIsRequestingInspection] = useState(false);
+  const [inspectionRequestMessage, setInspectionRequestMessage] = useState("");
+  const [showComplaintDialog, setShowComplaintDialog] = useState(false);
+  const [complaintText, setComplaintText] = useState("");
+  const [complaintMessage, setComplaintMessage] = useState("");
+  const [complaintError, setComplaintError] = useState("");
+  const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -75,6 +99,36 @@ export default function CarDetail() {
       .then((response) => setIsFavorite(response.ids.includes(id)))
       .catch(() => undefined);
   }, [id]);
+
+  useEffect(() => {
+    if (!id) return;
+    getCarInspection(id)
+      .then(setInspectionCase)
+      .catch(() => setInspectionCase(null));
+  }, [id]);
+
+  const handleRequestInspection = async () => {
+    if (!id) return;
+    if (!getCustomerAccessToken()) {
+      setInspectionRequestMessage(t("createAccountOrSignIn"));
+      navigate("/register");
+      return;
+    }
+    setIsRequestingInspection(true);
+    setInspectionRequestMessage("");
+    try {
+      await requestCarInspection(id, { intent: inspectionIntent, notes: inspectionNotes || undefined });
+      setInspectionRequestMessage("Your inspection request has been submitted. Drive X will follow up shortly.");
+      setShowRequestInspection(false);
+      setInspectionNotes("");
+      const refreshed = await getCarInspection(id);
+      setInspectionCase(refreshed);
+    } catch (error) {
+      setInspectionRequestMessage(error instanceof Error ? error.message : "Could not submit the request.");
+    } finally {
+      setIsRequestingInspection(false);
+    }
+  };
 
   const toggleFavorite = async () => {
     if (!car) return;
@@ -145,6 +199,39 @@ export default function CarDetail() {
       return;
     }
     window.location.href = `sms:?body=${encodeURIComponent(shareText)}`;
+  };
+
+  const openComplaintDialog = () => {
+    if (!getCustomerAccessToken()) {
+      setComplaintError(t("createAccountOrSignIn"));
+      navigate("/register");
+      return;
+    }
+    setComplaintText("");
+    setComplaintMessage("");
+    setComplaintError("");
+    setShowComplaintDialog(true);
+  };
+
+  const handleSubmitComplaint = async () => {
+    if (!car) return;
+    if (complaintText.trim().length < 10) {
+      setComplaintError("Please describe the issue in at least 10 characters.");
+      return;
+    }
+    setIsSubmittingComplaint(true);
+    setComplaintError("");
+    setComplaintMessage("");
+    try {
+      await submitCarComplaint(car.id, complaintText.trim());
+      setComplaintMessage("Your report has been submitted. The Drive X team will review it.");
+      setComplaintText("");
+      setTimeout(() => setShowComplaintDialog(false), 1500);
+    } catch (error) {
+      setComplaintError(error instanceof Error ? error.message : "Could not submit the report.");
+    } finally {
+      setIsSubmittingComplaint(false);
+    }
   };
 
   if (isLoading) {
@@ -275,6 +362,14 @@ export default function CarDetail() {
                     {car.rating} ({car.reviews} {t("reviews")})
                   </span>
                 </div>
+                {car.vendorName && (
+                  <div className="flex items-center gap-2 mt-3">
+                    <span className="inline-flex items-center gap-1.5 text-xs px-2.5 py-1 rounded-full bg-gold/10 text-gold border border-gold/20">
+                      <ShieldCheck className="w-3.5 h-3.5" />
+                      Sold by: {car.vendorName}
+                    </span>
+                  </div>
+                )}
               </div>
             </div>
             {favoriteMessage && (
@@ -336,6 +431,13 @@ export default function CarDetail() {
                   {t("sendInquiry")}
                 </Button>
               </div>
+
+              <button
+                onClick={openComplaintDialog}
+                className="mt-3 text-xs text-white/40 hover:text-white/70 transition-colors underline underline-offset-2"
+              >
+                Report an issue with this listing
+              </button>
             </div>
 
             {/* Quick Specs */}
@@ -358,6 +460,99 @@ export default function CarDetail() {
               <p className="text-white/60 leading-relaxed">{car.description}</p>
             </div>
           </div>
+        </div>
+
+        {/* Inspection & Maintenance History */}
+        <div className="bg-dark-card border border-gold/20 rounded-xl p-6 mb-12">
+          {(() => {
+            const certifiedRound = inspectionCase?.rounds.find((r) => r.status === "CERTIFIED");
+            const acceptedFileRound = inspectionCase?.rounds.find((r) => r.status === "FILE_ACCEPTED");
+            const badgeRound = certifiedRound ?? acceptedFileRound;
+            return (
+              <>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-full bg-gold/10 flex items-center justify-center shrink-0">
+                      {certifiedRound ? (
+                        <ShieldCheck className="w-5 h-5 text-gold" />
+                      ) : (
+                        <FileText className="w-5 h-5 text-gold" />
+                      )}
+                    </div>
+                    <div>
+                      <h3 className="text-white font-bold text-lg">
+                        {certifiedRound
+                          ? "Drive X Certified"
+                          : acceptedFileRound
+                            ? "Seller-Provided Maintenance Record"
+                            : "Maintenance History"}
+                      </h3>
+                      <p className="text-white/50 text-xs">
+                        {certifiedRound
+                          ? "Inspected and certified by a Drive X partner technician"
+                          : acceptedFileRound
+                            ? "Not yet inspected by a Drive X technician - you can request one below"
+                            : "No maintenance record on file yet"}
+                      </p>
+                    </div>
+                  </div>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setShowRequestInspection(true)}
+                    className="border-gold/30 text-gold hover:bg-gold/10 shrink-0"
+                  >
+                    Request a Professional Inspection
+                  </Button>
+                </div>
+
+                {inspectionRequestMessage && (
+                  <p className="text-gold text-sm mb-4">{inspectionRequestMessage}</p>
+                )}
+
+                {badgeRound?.templateData && (
+                  <p className="text-white/60 text-sm mb-4">{String(badgeRound.templateData.notes ?? "")}</p>
+                )}
+                {badgeRound?.externalFileUrl && (
+                  <a
+                    href={badgeRound.externalFileUrl}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="text-gold text-sm underline mb-4 inline-block"
+                  >
+                    View maintenance document
+                  </a>
+                )}
+
+                {inspectionCase && inspectionCase.rounds.length > 0 && (
+                  <div className="space-y-2 mt-2">
+                    {inspectionCase.rounds.map((round) => (
+                      <div key={round.id} className="border border-gold/10 rounded-lg p-3">
+                        <div className="flex items-center justify-between">
+                          <span className="text-white/70 text-sm">
+                            Round #{round.roundNumber} - {new Date(round.createdAt).toLocaleDateString()}
+                          </span>
+                          <span className="text-xs px-2 py-1 rounded-full bg-gold/10 text-gold">{round.status}</span>
+                        </div>
+                        {round.findings.length > 0 && (
+                          <ul className="mt-2 space-y-1">
+                            {round.findings.map((finding) => (
+                              <li key={finding.id} className="text-xs text-orange-300">
+                                - {finding.description} ({finding.severity})
+                                {finding.estimatedRepairCost && (
+                                  <> — est. repair {finding.estimatedRepairCost.amount} {finding.estimatedRepairCost.currency}</>
+                                )}
+                              </li>
+                            ))}
+                          </ul>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </>
+            );
+          })()}
         </div>
 
         {/* Features & Specs Tabs */}
@@ -538,6 +733,85 @@ export default function CarDetail() {
                 <span className="text-white/60 text-xs">{t(item.name)}</span>
               </button>
             ))}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={showRequestInspection} onOpenChange={setShowRequestInspection}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Request a Professional Inspection</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-white/60 text-sm">
+              A Drive X partner technician will visit and inspect this car, then publish a certified report.
+            </p>
+            <div className="flex gap-2">
+              {(["BUY", "RENT"] as const).map((option) => (
+                <Button
+                  key={option}
+                  type="button"
+                  variant={inspectionIntent === option ? "default" : "outline"}
+                  size="sm"
+                  onClick={() => setInspectionIntent(option)}
+                  className={inspectionIntent === option ? "bg-gold text-dark" : "border-gold/30 text-gold"}
+                >
+                  {option === "BUY" ? "I want to buy" : "I want to rent"}
+                </Button>
+              ))}
+            </div>
+            <Textarea
+              placeholder="Anything specific you'd like checked? (optional)"
+              value={inspectionNotes}
+              onChange={(event) => setInspectionNotes(event.target.value)}
+              className="bg-dark border-gold/20 text-white min-h-20"
+            />
+            {inspectionRequestMessage && <p className="text-gold text-sm">{inspectionRequestMessage}</p>}
+            <Button
+              onClick={handleRequestInspection}
+              disabled={isRequestingInspection}
+              className="w-full bg-gold hover:bg-gold-light text-dark font-bold"
+            >
+              {isRequestingInspection ? "Submitting..." : "Submit Request"}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      {/* Report Issue Dialog */}
+      <Dialog open={showComplaintDialog} onOpenChange={setShowComplaintDialog}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-md">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Report an Issue</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="bg-dark p-4 rounded-lg border border-gold/20">
+              <p className="text-gold font-bold text-lg">{car.brand} {car.model}</p>
+              {car.vendorName && <p className="text-white/50 text-sm">Sold by: {car.vendorName}</p>}
+            </div>
+            <Textarea
+              placeholder="Describe the issue (e.g. misrepresentation, condition worse than listed, paperwork problems...)"
+              value={complaintText}
+              onChange={(event) => setComplaintText(event.target.value)}
+              className="bg-dark border-gold/20 text-white min-h-28"
+            />
+            {complaintMessage && (
+              <div className="rounded-lg border border-green-500/30 bg-green-500/10 p-3 text-sm text-green-300">
+                {complaintMessage}
+              </div>
+            )}
+            {complaintError && (
+              <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300">
+                {complaintError}
+              </div>
+            )}
+            <Button
+              onClick={handleSubmitComplaint}
+              disabled={isSubmittingComplaint}
+              className="w-full bg-gold hover:bg-gold-light text-dark font-bold"
+            >
+              {isSubmittingComplaint ? "Submitting..." : "Submit Report"}
+            </Button>
           </div>
         </DialogContent>
       </Dialog>

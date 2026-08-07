@@ -3,7 +3,7 @@ import { Link, useNavigate } from "react-router";
 import { Eye, EyeOff, LogIn, Car, ArrowLeft, Mail, Lock, Shield, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Checkbox } from "@/components/ui/checkbox";
+import { setAdminSessionProfile } from "@/lib/api";
 import { getCurrentAdmin, loginAdmin } from "@/lib/auth-api";
 import { loginCustomer } from "@/lib/public-api";
 import { useI18n } from "@/lib/i18n";
@@ -16,7 +16,6 @@ export default function Login() {
   const [showPassword, setShowPassword] = useState(false);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [rememberMe, setRememberMe] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
@@ -35,14 +34,11 @@ export default function Login() {
       if (mode === "admin") {
         await loginAdmin(email, password);
         const admin = await getCurrentAdmin().catch(() => undefined);
-        localStorage.setItem(
-          "drive_x_auth",
-          JSON.stringify({
-            email: admin?.email ?? email,
-            name: admin?.fullName ?? "Admin User",
-            role: admin?.role ?? "OWNER",
-          })
-        );
+        setAdminSessionProfile({
+          email: admin?.email ?? email,
+          name: admin?.fullName ?? "Seller User",
+          role: admin?.role ?? "OWNER",
+        });
         navigate("/dashboard");
       } else {
         await loginCustomer(email, password);
@@ -152,7 +148,7 @@ export default function Login() {
               }`}
             >
               <Shield className="w-4 h-4" />
-              {t("admin")}
+              {t("seller")}
             </button>
           </div>
 
@@ -169,7 +165,7 @@ export default function Login() {
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
                   type="email"
-                  placeholder={mode === "customer" ? "you@example.com" : "admin@drivex.com"}
+                  placeholder={mode === "customer" ? "you@example.com" : "seller@example.com"}
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
                   className="pl-10 bg-dark-card border-gold/20 text-white placeholder:text-white/30 focus:border-gold focus:ring-gold/20"
@@ -198,18 +194,7 @@ export default function Login() {
               </div>
             </div>
 
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Checkbox
-                  id="remember"
-                  checked={rememberMe}
-                  onCheckedChange={(checked) => setRememberMe(checked as boolean)}
-                  className="border-gold/30 data-[state=checked]:bg-gold data-[state=checked]:text-dark"
-                />
-                <label htmlFor="remember" className="text-white/60 text-sm cursor-pointer">
-                  {t("rememberMe")}
-                </label>
-              </div>
+            <div className="flex items-center justify-end">
               {mode === "admin" && (
                 <Link to="/forgot-password" className="text-gold hover:text-gold-light text-sm font-medium">
                   {t("forgotPassword")}
@@ -227,7 +212,7 @@ export default function Login() {
               ) : (
                 <>
                   <LogIn className="w-5 h-5 mr-2" />
-                  {t("signInAs")} {mode === "customer" ? t("customer") : t("admin")}
+                  {t("signInAs")} {mode === "customer" ? t("customer") : t("seller")}
                 </>
               )}
             </Button>

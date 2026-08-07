@@ -32,17 +32,13 @@ const listingTypeOptions = [
 export default function Home() {
   const navigate = useNavigate();
   const { t } = useI18n();
-  const [heroLoaded, setHeroLoaded] = useState(false);
+  const [heroLoaded] = useState(true);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [quickSearch, setQuickSearch] = useState({ category: "All", brand: "All", priceRange: "All" });
   const [featuredCars, setFeaturedCars] = useState<CarView[]>([]);
   const [featuredCarsLoading, setFeaturedCarsLoading] = useState(true);
   const [filterBrands, setFilterBrands] = useState<string[]>(["All"]);
   const [listingTypeCounts, setListingTypeCounts] = useState<Record<string, number>>({});
-
-  useEffect(() => {
-    setHeroLoaded(true);
-  }, []);
 
   useEffect(() => {
     getFiltersMeta()
@@ -129,7 +125,7 @@ export default function Home() {
                   <ArrowRight className="w-5 h-5 ml-2 group-hover:translate-x-1 transition-transform" />
                 </Button>
               </Link>
-              <Link to="/register">
+              <Link to="/vendor-register">
                 <Button
                   variant="outline"
                   size="lg"

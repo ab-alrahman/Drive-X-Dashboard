@@ -1,4 +1,4 @@
-import { useEffect, useState, useMemo } from "react";
+import { useCallback, useEffect, useState, useMemo } from "react";
 import { useNavigate, Link } from "react-router";
 import {
   User,
@@ -19,11 +19,11 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { clearCustomerAuthTokens, getCustomerAccessToken } from "@/lib/api";
+import { clearCustomerAuthTokens, getCustomerAccessToken, setCustomerSessionProfile } from "@/lib/api";
 import { getCurrentCustomer, getFavoriteCars, getMyLeads, updateMyProfile } from "@/lib/public-api";
 import type { ApiCar, LeadResponse, CustomerProfile } from "@/lib/api-types";
 import { resolveAssetUrl } from "@/lib/api";
-import { useI18n } from "@/lib/i18n";
+import { useI18n, type MessageKey } from "@/lib/i18n";
 
 type Tab = "inquiries" | "favorites" | "profile";
 
@@ -41,7 +41,7 @@ export default function CustomerDashboard() {
   const [savingProfile, setSavingProfile] = useState(false);
   const [profileMessage, setProfileMessage] = useState("");
 
-  const statusConfig: Record<string, { labelKey: string; color: string; icon: typeof Clock }> = useMemo(() => ({
+  const statusConfig: Record<string, { labelKey: MessageKey; color: string; icon: typeof Clock }> = useMemo(() => ({
     NEW: { labelKey: "statusNew", color: "text-blue-400 bg-blue-500/10 border-blue-500/20", icon: Clock },
     CONTACTED: { labelKey: "statusContacted", color: "text-yellow-400 bg-yellow-500/10 border-yellow-500/20", icon: Phone },
     NEGOTIATING: { labelKey: "statusInNegotiation", color: "text-orange-400 bg-orange-500/10 border-orange-500/20", icon: AlertCircle },
@@ -50,15 +50,7 @@ export default function CustomerDashboard() {
     CLOSED: { labelKey: "statusClosed", color: "text-gray-400 bg-gray-500/10 border-gray-500/20", icon: CheckCircle },
   }), []);
 
-  useEffect(() => {
-    if (!getCustomerAccessToken()) {
-      navigate("/login");
-      return;
-    }
-    loadData();
-  }, [navigate]);
-
-  async function loadData() {
+  const loadData = useCallback(async () => {
     setLoading(true);
     setError("");
     try {
@@ -76,11 +68,18 @@ export default function CustomerDashboard() {
     } finally {
       setLoading(false);
     }
-  }
+  }, [t]);
+
+  useEffect(() => {
+    if (!getCustomerAccessToken()) {
+      navigate("/login");
+      return;
+    }
+    loadData();
+  }, [loadData, navigate]);
 
   const handleLogout = () => {
     clearCustomerAuthTokens();
-    localStorage.removeItem("drive_x_customer");
     navigate("/");
   };
 
@@ -94,7 +93,7 @@ export default function CustomerDashboard() {
         phone: profileForm.phone || undefined,
       });
       setProfile(updated);
-      localStorage.setItem("drive_x_customer", JSON.stringify(updated));
+      setCustomerSessionProfile(updated);
       setProfileMessage(t("profileUpdatedSuccess"));
     } catch (err) {
       setProfileMessage(err instanceof Error ? err.message : t("failedToUpdateProfile"));
@@ -219,7 +218,7 @@ export default function CustomerDashboard() {
                                 </div>
                                 <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full text-xs font-medium border ${cfg.color}`}>
                                   <StatusIcon className="w-3 h-3" />
-                                  {t(cfg.labelKey as any)}
+                                  {t(cfg.labelKey)}
                                 </span>
                               </div>
                               <div className="flex flex-wrap items-center gap-3 text-xs text-white/40">
