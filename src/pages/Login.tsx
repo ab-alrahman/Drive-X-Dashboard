@@ -122,6 +122,14 @@ export default function Login() {
                 t("signInToAdmin")
               )}
             </p>
+            {mode === "admin" && (
+              <p className="text-white/40 text-xs mt-3">
+                Platform administrator?{" "}
+                <Link to="/admin-login" className="text-gold hover:text-gold-light font-medium">
+                  Use admin portal
+                </Link>
+              </p>
+            )}
           </div>
 
           {/* Mode Toggle */}

@@ -302,3 +302,129 @@ export interface Complaint {
   reviewNote?: string;
   createdAt: string;
 }
+
+export type MaintenanceRequestType =
+  | "ROUTINE_SERVICE"
+  | "REPAIR"
+  | "DIAGNOSTIC"
+  | "BODY_PAINT"
+  | "TIRES_BRAKES"
+  | "EMERGENCY"
+  | "OTHER";
+
+export type MaintenanceStatus =
+  | "NEW"
+  | "ADMIN_REVIEW"
+  | "TRIAGED"
+  | "SENT_TO_VENDOR"
+  | "VENDOR_ACKNOWLEDGED"
+  | "ASSIGNED_TO_PARTNER"
+  | "SCHEDULED"
+  | "IN_PROGRESS"
+  | "WAITING_CUSTOMER_APPROVAL"
+  | "COMPLETED"
+  | "CANCELLED"
+  | "REJECTED";
+
+export interface MaintenanceUpdate {
+  id: string;
+  requestId: string;
+  authorRole: "CUSTOMER" | "VENDOR" | "PLATFORM_ADMIN" | "SYSTEM";
+  authorAdminId?: string;
+  authorCustomerId?: string;
+  statusFrom?: MaintenanceStatus;
+  statusTo?: MaintenanceStatus;
+  note?: string;
+  isPublic: boolean;
+  createdAt: string;
+}
+
+export interface MaintenanceFile {
+  id: string;
+  requestId: string;
+  fileUrl: string;
+  storageKey?: string;
+  fileType?: string;
+  createdAt: string;
+}
+
+export interface MaintenanceRequest {
+  id: string;
+  customerId: string;
+  customerName?: string;
+  customerEmail?: string;
+  carId: string;
+  dealId?: string;
+  dealType?: "SALE" | "RENT";
+  vendorId?: string;
+  vendorName?: string;
+  assignedPartnerId?: string;
+  assignedPartnerName?: string;
+  requestType: MaintenanceRequestType;
+  status: MaintenanceStatus;
+  city: string;
+  preferredTime?: string;
+  pickupNeeded: boolean;
+  notes: string;
+  contactPhone: string;
+  quote?: Money;
+  approvedAmount?: Money;
+  quoteApprovedAt?: string;
+  publicSummary?: string;
+  completedAt?: string;
+  createdAt: string;
+  updatedAt: string;
+  car?: {
+    brand: string;
+    model: string;
+    year: number;
+    listingType?: ListingType;
+    imageUrl?: string;
+  };
+  updates?: MaintenanceUpdate[];
+  files?: MaintenanceFile[];
+}
+
+export interface CustomerCarAsset {
+  dealId: string;
+  dealType: "SALE" | "RENT";
+  dealCreatedAt: string;
+  car: {
+    id: string;
+    brand: string;
+    model: string;
+    year: number;
+    listingType: ListingType;
+    status: CarStatus;
+    vendorId?: string;
+    vendorName?: string;
+    imageUrl?: string;
+  };
+}
+
+export interface PublicMaintenanceRecord {
+  id: string;
+  carId: string;
+  requestType: MaintenanceRequestType;
+  status: "COMPLETED";
+  publicSummary?: string;
+  completedAt?: string;
+  partnerName?: string;
+  createdAt: string;
+}
+
+export interface PublicMaintenanceHistory {
+  carId: string;
+  items: PublicMaintenanceRecord[];
+}
+
+export interface CreateMaintenanceRequest {
+  carId: string;
+  dealId?: string;
+  requestType: MaintenanceRequestType;
+  city: string;
+  preferredTime?: string;
+  pickupNeeded?: boolean;
+  notes: string;
+  contactPhone: string;
+}

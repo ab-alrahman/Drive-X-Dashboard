@@ -211,7 +211,7 @@ export default function Navbar() {
                     </DropdownMenuItem>
                   )}
                   <DropdownMenuItem
-                    onClick={() => navigate("/inventory")}
+                    onClick={() => navigate(session.isAdminLoggedIn ? "/dashboard" : "/my-dashboard?tab=favorites")}
                     className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
                   >
                     <Heart className="mr-2 h-4 w-4" />
@@ -310,6 +310,15 @@ export default function Navbar() {
                         className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
                       >
                         <LayoutDashboard className="w-4 h-4" /> {t("myDashboard")}
+                      </Link>
+                    )}
+                    {!session.isAdminLoggedIn && session.isLoggedIn && (
+                      <Link
+                        to="/my-dashboard?tab=favorites"
+                        onClick={() => setMobileMenuOpen(false)}
+                        className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
+                      >
+                        <Heart className="w-4 h-4" /> {t("myFavorites")}
                       </Link>
                     )}
                     <button

@@ -10,6 +10,11 @@ import type {
   InspectionRound,
   LeadCreatedResponse,
   LeadResponse,
+  CreateMaintenanceRequest,
+  CustomerCarAsset,
+  MaintenanceFile,
+  MaintenanceRequest,
+  PublicMaintenanceHistory,
   PaginatedResponse,
 } from "./api-types";
 
@@ -120,4 +125,63 @@ export function requestCarInspection(carId: string, payload: { intent: "BUY" | "
     auth: "customer",
     body: JSON.stringify(payload),
   });
+}
+
+export function getMyCars() {
+  return apiFetch<CustomerCarAsset[]>("/v1/public/me/cars", { auth: "customer" });
+}
+
+export function getMyMaintenanceRequests(params: { page?: number; limit?: number; status?: string } = {}) {
+  return apiFetch<PaginatedResponse<MaintenanceRequest>>(
+    `/v1/public/me/maintenance/requests${toQueryString(params)}`,
+    { auth: "customer" }
+  );
+}
+
+export function getMyMaintenanceRequest(requestId: string) {
+  return apiFetch<MaintenanceRequest>(`/v1/public/maintenance/requests/${requestId}`, { auth: "customer" });
+}
+
+export function createMaintenanceRequest(payload: CreateMaintenanceRequest) {
+  return apiFetch<MaintenanceRequest>("/v1/public/maintenance/requests", {
+    method: "POST",
+    auth: "customer",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function uploadMaintenanceRequestFile(requestId: string, file: File) {
+  const formData = new FormData();
+  formData.set("file", file);
+  return apiFetch<MaintenanceFile>(`/v1/public/maintenance/requests/${requestId}/files`, {
+    method: "POST",
+    auth: "customer",
+    body: formData,
+  });
+}
+
+export function cancelMaintenanceRequest(requestId: string) {
+  return apiFetch<MaintenanceRequest>(`/v1/public/maintenance/requests/${requestId}/cancel`, {
+    method: "PATCH",
+    auth: "customer",
+  });
+}
+
+export function approveMaintenanceQuote(requestId: string) {
+  return apiFetch<MaintenanceRequest>(`/v1/public/maintenance/requests/${requestId}/approve-quote`, {
+    method: "PATCH",
+    auth: "customer",
+  });
+}
+
+export function rejectMaintenanceQuote(requestId: string, payload: { note?: string } = {}) {
+  return apiFetch<MaintenanceRequest>(`/v1/public/maintenance/requests/${requestId}/reject-quote`, {
+    method: "PATCH",
+    auth: "customer",
+    body: JSON.stringify(payload),
+  });
+}
+
+export function getCarMaintenanceHistory(carId: string) {
+  return apiFetch<PublicMaintenanceHistory>(`/v1/public/cars/${carId}/maintenance/history`);
 }

@@ -3,6 +3,7 @@ import Navbar from './components/Navbar'
 import Footer from './components/Footer'
 import Home from './pages/Home'
 import Login from './pages/Login'
+import AdminLogin from './pages/AdminLogin'
 import Register from './pages/Register'
 import VendorRegister from './pages/VendorRegister'
 import Inventory from './pages/Inventory'
@@ -12,6 +13,7 @@ import CustomerDashboard from './pages/CustomerDashboard'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import RequireAuth from './components/RequireAuth'
+import FirstVisitGuide from './components/FirstVisitGuide'
 import { I18nProvider } from './lib/i18n'
 
 export default function App() {
@@ -19,10 +21,12 @@ export default function App() {
     <I18nProvider>
     <div className="min-h-screen bg-dark">
       <Navbar />
+      <FirstVisitGuide />
       <main>
         <Routes>
           <Route path="/" element={<Home />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/admin-login" element={<AdminLogin />} />
           <Route path="/register" element={<Register />} />
           <Route path="/vendor-register" element={<VendorRegister />} />
           <Route path="/inventory" element={<Inventory />} />

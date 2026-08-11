@@ -29,6 +29,7 @@ import {
   Eye,
   EyeOff,
   X,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -41,6 +42,13 @@ import {
   getAdminDashboardSummary,
   getAdminDeals,
   getAdminLeads,
+  getAdminMaintenanceRequest,
+  getAdminMaintenanceRequests,
+  addMaintenanceRequestUpdate,
+  assignMaintenancePartner,
+  scheduleMaintenanceRequest,
+  triageMaintenanceRequest,
+  updateMaintenanceRequestStatus,
   updateAdminCar,
   updateAdminLead,
 } from "@/lib/admin-api";
@@ -58,6 +66,7 @@ import type {
   InspectionPaidBy,
   InspectionServiceTier,
   LeadResponse,
+  MaintenanceRequest,
   Technician,
   Vendor,
 } from "@/lib/api-types";
@@ -143,6 +152,14 @@ export default function Dashboard() {
   const [dashboardCars, setDashboardCars] = useState<CarView[]>([]);
   const [leads, setLeads] = useState<LeadResponse[]>([]);
   const [deals, setDeals] = useState<DealResponse[]>([]);
+  const [maintenanceRequests, setMaintenanceRequests] = useState<MaintenanceRequest[]>([]);
+  const [maintenanceDetailOpen, setMaintenanceDetailOpen] = useState(false);
+  const [selectedMaintenanceRequest, setSelectedMaintenanceRequest] = useState<MaintenanceRequest | null>(null);
+  const [maintenanceQuoteAmount, setMaintenanceQuoteAmount] = useState("");
+  const [maintenanceNote, setMaintenanceNote] = useState("");
+  const [maintenanceNotePublic, setMaintenanceNotePublic] = useState(false);
+  const [maintenancePublicSummary, setMaintenancePublicSummary] = useState("");
+  const [isSavingMaintenanceAction, setIsSavingMaintenanceAction] = useState(false);
   const [dashboardError, setDashboardError] = useState("");
   const [actionMessage, setActionMessage] = useState("");
   const [carDialogOpen, setCarDialogOpen] = useState(false);
@@ -229,12 +246,13 @@ export default function Dashboard() {
   const refreshDashboardData = async () => {
     if (!getAccessToken()) return;
 
-    const [summary, carsResponse, leadsResponse, dealsResponse, techniciansResponse] = await Promise.all([
+    const [summary, carsResponse, leadsResponse, dealsResponse, techniciansResponse, maintenanceResponse] = await Promise.all([
       getAdminDashboardSummary(),
       getAdminCars({ page: 1, limit: 20 }),
       getAdminLeads({ page: 1, limit: 20 }),
       getAdminDeals({ page: 1, limit: 20 }),
       getTechnicians(),
+      getAdminMaintenanceRequests({ page: 1, limit: 50 }),
     ]);
     setDashboardSummary(summary);
     setAdminCars(carsResponse.items);
@@ -242,7 +260,83 @@ export default function Dashboard() {
     setLeads(leadsResponse.items);
     setDeals(dealsResponse.items);
     setTechnicians(techniciansResponse);
+    setMaintenanceRequests(maintenanceResponse.items);
     setDashboardError("");
+  };
+
+  const openMaintenanceDetail = async (requestId: string) => {
+    setDashboardError("");
+    const request = await getAdminMaintenanceRequest(requestId);
+    setSelectedMaintenanceRequest(request);
+    setMaintenanceQuoteAmount(request.quote?.amount ? String(request.quote.amount) : "");
+    setMaintenancePublicSummary(request.publicSummary ?? "");
+    setMaintenanceNote("");
+    setMaintenanceNotePublic(false);
+    setMaintenanceDetailOpen(true);
+  };
+
+  const refreshSelectedMaintenanceRequest = async () => {
+    if (!selectedMaintenanceRequest) return;
+    const request = await getAdminMaintenanceRequest(selectedMaintenanceRequest.id);
+    setSelectedMaintenanceRequest(request);
+    const maintenanceResponse = await getAdminMaintenanceRequests({ page: 1, limit: 50 });
+    setMaintenanceRequests(maintenanceResponse.items);
+  };
+
+  const setMaintenanceQuote = async () => {
+    if (!selectedMaintenanceRequest || !maintenanceQuoteAmount) return;
+    setIsSavingMaintenanceAction(true);
+    try {
+      const quote = Number(maintenanceQuoteAmount);
+      await updateMaintenanceRequestStatus(selectedMaintenanceRequest.id, {
+        status: "WAITING_CUSTOMER_APPROVAL",
+        quotedAmount: quote,
+        quotedCurrency: "USD",
+        note: `Quote set at ${quote} USD.`
+      });
+      await refreshSelectedMaintenanceRequest();
+      setActionMessage("Maintenance quote sent to customer.");
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not set maintenance quote.");
+    } finally {
+      setIsSavingMaintenanceAction(false);
+    }
+  };
+
+  const addMaintenanceNote = async () => {
+    if (!selectedMaintenanceRequest || !maintenanceNote.trim()) return;
+    setIsSavingMaintenanceAction(true);
+    try {
+      await addMaintenanceRequestUpdate(selectedMaintenanceRequest.id, {
+        note: maintenanceNote.trim(),
+        isPublic: maintenanceNotePublic,
+      });
+      setMaintenanceNote("");
+      setMaintenanceNotePublic(false);
+      await refreshSelectedMaintenanceRequest();
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not add maintenance update.");
+    } finally {
+      setIsSavingMaintenanceAction(false);
+    }
+  };
+
+  const completeSelectedMaintenance = async () => {
+    if (!selectedMaintenanceRequest) return;
+    setIsSavingMaintenanceAction(true);
+    try {
+      await updateMaintenanceRequestStatus(selectedMaintenanceRequest.id, {
+        status: "COMPLETED",
+        note: "Maintenance completed.",
+        publicSummary: maintenancePublicSummary || "Drive X verified maintenance completed."
+      });
+      await refreshSelectedMaintenanceRequest();
+      setActionMessage("Maintenance request completed.");
+    } catch (error) {
+      setDashboardError(error instanceof Error ? error.message : "Could not complete maintenance request.");
+    } finally {
+      setIsSavingMaintenanceAction(false);
+    }
   };
 
   useEffect(() => {
@@ -843,6 +937,7 @@ export default function Dashboard() {
     { id: "inquiries", label: "Inquiries", icon: MessageSquare },
     { id: "deals", label: "Deals", icon: Handshake },
     { id: "inspections", label: "Inspections", icon: ShieldCheck },
+    { id: "maintenance", label: "Maintenance", icon: Wrench },
     { id: "favorites", label: "Favorites", icon: Heart },
     { id: "analytics", label: "Analytics", icon: TrendingUp },
     { id: "settings", label: "Settings", icon: Settings },
@@ -1484,6 +1579,196 @@ export default function Dashboard() {
                         </tbody>
                       </table>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {activeTab === "maintenance" && (
+              <div className="space-y-6">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div>
+                    <h3 className="text-white font-bold text-lg">Maintenance Requests</h3>
+                    <p className="text-white/50 text-sm mt-1">
+                      Coordinate customer maintenance for Drive X cars. Rental requests stay under platform review before vendors can act.
+                    </p>
+                  </div>
+                  <Button
+                    variant="outline"
+                    onClick={() => refreshDashboardData().catch((error: Error) => setDashboardError(error.message))}
+                    className="border-gold/30 text-gold hover:bg-gold/10"
+                  >
+                    Refresh
+                  </Button>
+                </div>
+
+                <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gold/10">
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Customer / Car</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Type</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Vendor</th>
+                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {maintenanceRequests.map((request) => {
+                          const firstActiveTechnician = technicians.find((technician) => technician.isActive);
+                          const canVendorAcknowledge = !isPlatformAdmin && request.status === "SENT_TO_VENDOR";
+                          return (
+                            <tr key={request.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors align-top">
+                              <td className="px-4 py-3">
+                                <p className="text-white font-medium text-sm">{request.customerName ?? "Customer"}</p>
+                                <p className="text-white/50 text-xs">{request.car ? `${request.car.brand} ${request.car.model} ${request.car.year}` : request.carId}</p>
+                                <p className="text-white/40 text-xs mt-1">{request.city} · {new Date(request.createdAt).toLocaleDateString()}</p>
+                              </td>
+                              <td className="px-4 py-3 text-white/70 text-sm">{request.requestType.replaceAll("_", " ")}</td>
+                              <td className="px-4 py-3">
+                                <span className="text-xs px-2 py-1 rounded-full bg-gold/10 text-gold">
+                                  {request.status.replaceAll("_", " ")}
+                                </span>
+                                {request.dealType === "RENT" && (
+                                  <p className="text-orange-400 text-xs mt-2">Rental flow</p>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-white/60 text-sm">
+                                {request.vendorName ?? "-"}
+                                {request.assignedPartnerName && (
+                                  <p className="text-[#00D2FF] text-xs mt-1">{request.assignedPartnerName}</p>
+                                )}
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-wrap justify-end gap-2">
+                                  <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => openMaintenanceDetail(request.id)}
+                                    className="border-white/20 text-white/80 hover:bg-white/10"
+                                  >
+                                    Details
+                                  </Button>
+                                  {isPlatformAdmin && request.status === "ADMIN_REVIEW" && (
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        await triageMaintenanceRequest(request.id, { status: "SENT_TO_VENDOR", note: "Rental maintenance routed to vendor." });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="bg-gold hover:bg-gold-light text-dark"
+                                    >
+                                      Send Vendor
+                                    </Button>
+                                  )}
+                                  {isPlatformAdmin && request.status === "NEW" && (
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        await triageMaintenanceRequest(request.id, { status: "TRIAGED", note: "Request triaged by platform." });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="bg-gold hover:bg-gold-light text-dark"
+                                    >
+                                      Triage
+                                    </Button>
+                                  )}
+                                  {canVendorAcknowledge && (
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        await updateMaintenanceRequestStatus(request.id, { status: "VENDOR_ACKNOWLEDGED", note: "Vendor acknowledged rental maintenance." });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="bg-gold hover:bg-gold-light text-dark"
+                                    >
+                                      Acknowledge
+                                    </Button>
+                                  )}
+                                  {isPlatformAdmin && ["TRIAGED", "VENDOR_ACKNOWLEDGED"].includes(request.status) && firstActiveTechnician && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        await assignMaintenancePartner(request.id, { partnerId: firstActiveTechnician.id, note: `Assigned to ${firstActiveTechnician.name}.` });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="border-gold/30 text-gold hover:bg-gold/10"
+                                    >
+                                      Assign
+                                    </Button>
+                                  )}
+                                  {isPlatformAdmin && ["ASSIGNED_TO_PARTNER", "VENDOR_ACKNOWLEDGED", "TRIAGED"].includes(request.status) && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        const scheduledAt = new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString();
+                                        await scheduleMaintenanceRequest(request.id, { scheduledAt, note: "Maintenance scheduled." });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="border-gold/30 text-gold hover:bg-gold/10"
+                                    >
+                                      Schedule
+                                    </Button>
+                                  )}
+                                  {isPlatformAdmin && request.status === "SCHEDULED" && (
+                                    <Button
+                                      size="sm"
+                                      variant="outline"
+                                      onClick={async () => {
+                                        await updateMaintenanceRequestStatus(request.id, { status: "IN_PROGRESS", note: "Maintenance work started." });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="border-gold/30 text-gold hover:bg-gold/10"
+                                    >
+                                      Start
+                                    </Button>
+                                  )}
+                                  {isPlatformAdmin && request.status === "IN_PROGRESS" && (
+                                    <Button
+                                      size="sm"
+                                      onClick={async () => {
+                                        await updateMaintenanceRequestStatus(request.id, {
+                                          status: "COMPLETED",
+                                          note: "Maintenance completed.",
+                                          publicSummary: "Drive X verified maintenance completed."
+                                        });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="bg-green-500 hover:bg-green-600 text-white"
+                                    >
+                                      Complete
+                                    </Button>
+                                  )}
+                                  {isPlatformAdmin && !["COMPLETED", "CANCELLED", "REJECTED"].includes(request.status) && (
+                                    <Button
+                                      size="sm"
+                                      variant="ghost"
+                                      onClick={async () => {
+                                        await updateMaintenanceRequestStatus(request.id, { status: "REJECTED", note: "Request rejected by platform." });
+                                        await refreshDashboardData();
+                                      }}
+                                      className="text-red-400 hover:bg-red-500/10"
+                                    >
+                                      Reject
+                                    </Button>
+                                  )}
+                                </div>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                        {maintenanceRequests.length === 0 && (
+                          <tr>
+                            <td colSpan={5} className="px-4 py-8 text-center text-white/40 text-sm">
+                              No maintenance requests yet.
+                            </td>
+                          </tr>
+                        )}
+                      </tbody>
+                    </table>
                   </div>
                 </div>
               </div>
@@ -2355,6 +2640,147 @@ export default function Dashboard() {
                   </Button>
                 )}
               </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={maintenanceDetailOpen} onOpenChange={setMaintenanceDetailOpen}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">Maintenance Request Details</DialogTitle>
+          </DialogHeader>
+          {selectedMaintenanceRequest && (
+            <div className="space-y-5">
+              <div className="rounded-lg border border-gold/10 bg-dark/50 p-4">
+                <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                  <div>
+                    <p className="text-white font-semibold">
+                      {selectedMaintenanceRequest.customerName ?? "Customer"}
+                    </p>
+                    <p className="text-white/50 text-sm">
+                      {selectedMaintenanceRequest.car
+                        ? `${selectedMaintenanceRequest.car.brand} ${selectedMaintenanceRequest.car.model} ${selectedMaintenanceRequest.car.year}`
+                        : selectedMaintenanceRequest.carId}
+                    </p>
+                    <p className="text-white/40 text-xs mt-1">
+                      {selectedMaintenanceRequest.requestType.replaceAll("_", " ")} · {selectedMaintenanceRequest.city}
+                    </p>
+                  </div>
+                  <span className="px-3 py-1 rounded-full bg-gold/10 text-gold text-xs font-medium">
+                    {selectedMaintenanceRequest.status.replaceAll("_", " ")}
+                  </span>
+                </div>
+                <p className="text-white/60 text-sm mt-3">{selectedMaintenanceRequest.notes}</p>
+              </div>
+
+              {isPlatformAdmin && (
+                <div className="rounded-lg border border-gold/10 bg-dark/50 p-4">
+                  <h4 className="text-white font-semibold mb-3">Quote</h4>
+                  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
+                    <Input
+                      type="number"
+                      min="0"
+                      placeholder="Amount in USD"
+                      value={maintenanceQuoteAmount}
+                      onChange={(event) => setMaintenanceQuoteAmount(event.target.value)}
+                      className="bg-dark border-gold/20 text-white"
+                    />
+                    <Button
+                      onClick={setMaintenanceQuote}
+                      disabled={isSavingMaintenanceAction || !maintenanceQuoteAmount}
+                      className="bg-gold hover:bg-gold-light text-dark"
+                    >
+                      Send Quote
+                    </Button>
+                  </div>
+                </div>
+              )}
+
+              <div className="rounded-lg border border-gold/10 bg-dark/50 p-4">
+                <h4 className="text-white font-semibold mb-3">Updates</h4>
+                {selectedMaintenanceRequest.updates && selectedMaintenanceRequest.updates.length > 0 ? (
+                  <div className="space-y-3">
+                    {selectedMaintenanceRequest.updates.map((update) => (
+                      <div key={update.id} className="border-l border-gold/30 pl-3">
+                        <p className="text-white/70 text-sm">
+                          {update.statusTo ? update.statusTo.replaceAll("_", " ") : update.authorRole}
+                          {update.isPublic ? " · Public" : " · Internal"}
+                        </p>
+                        {update.note && <p className="text-white/50 text-sm">{update.note}</p>}
+                        <p className="text-white/30 text-xs">{new Date(update.createdAt).toLocaleString()}</p>
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-white/40 text-sm">No updates yet.</p>
+                )}
+
+                <div className="mt-4 space-y-3">
+                  <Textarea
+                    placeholder="Add an update note"
+                    value={maintenanceNote}
+                    onChange={(event) => setMaintenanceNote(event.target.value)}
+                    className="bg-dark border-gold/20 text-white min-h-24"
+                  />
+                  <label className="flex items-center gap-2 text-sm text-white/60">
+                    <input
+                      type="checkbox"
+                      checked={maintenanceNotePublic}
+                      onChange={(event) => setMaintenanceNotePublic(event.target.checked)}
+                    />
+                    Visible to customer
+                  </label>
+                  <Button
+                    onClick={addMaintenanceNote}
+                    disabled={isSavingMaintenanceAction || !maintenanceNote.trim()}
+                    variant="outline"
+                    className="border-gold/30 text-gold hover:bg-gold/10"
+                  >
+                    Add Update
+                  </Button>
+                </div>
+              </div>
+
+              <div className="rounded-lg border border-gold/10 bg-dark/50 p-4">
+                <h4 className="text-white font-semibold mb-3">Attachments</h4>
+                {selectedMaintenanceRequest.files && selectedMaintenanceRequest.files.length > 0 ? (
+                  <div className="space-y-2">
+                    {selectedMaintenanceRequest.files.map((file) => (
+                      <a
+                        key={file.id}
+                        href={file.fileUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block text-sm text-gold hover:underline"
+                      >
+                        {file.fileType ?? "Attachment"} · {new Date(file.createdAt).toLocaleDateString()}
+                      </a>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-white/40 text-sm">No attachments yet.</p>
+                )}
+              </div>
+
+              {isPlatformAdmin && selectedMaintenanceRequest.status === "IN_PROGRESS" && (
+                <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4">
+                  <h4 className="text-white font-semibold mb-3">Public Service Summary</h4>
+                  <Textarea
+                    placeholder="Sanitized public summary for the car page"
+                    value={maintenancePublicSummary}
+                    onChange={(event) => setMaintenancePublicSummary(event.target.value)}
+                    className="bg-dark border-green-500/20 text-white min-h-24"
+                  />
+                  <Button
+                    onClick={completeSelectedMaintenance}
+                    disabled={isSavingMaintenanceAction}
+                    className="mt-3 bg-green-500 hover:bg-green-600 text-white"
+                  >
+                    Complete Maintenance
+                  </Button>
+                </div>
+              )}
             </div>
           )}
         </DialogContent>

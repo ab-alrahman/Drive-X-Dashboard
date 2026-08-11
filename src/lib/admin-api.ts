@@ -7,6 +7,9 @@ import type {
   DashboardSummaryResponse,
   DealResponse,
   LeadResponse,
+  MaintenanceRequest,
+  MaintenanceStatus,
+  MaintenanceRequestType,
   PaginatedResponse,
 } from "./api-types";
 
@@ -113,5 +116,77 @@ export function deleteAdminDeal(dealId: string) {
   return apiFetch<void>(`/v1/admin/deals/${dealId}`, {
     method: "DELETE",
     auth: true,
+  });
+}
+
+export function getAdminMaintenanceRequests(params: {
+  page?: number;
+  limit?: number;
+  status?: MaintenanceStatus;
+  requestType?: MaintenanceRequestType;
+  city?: string;
+} = {}) {
+  return apiFetch<PaginatedResponse<MaintenanceRequest>>(
+    `/v1/admin/maintenance/requests${toQueryString(params)}`,
+    { auth: true }
+  );
+}
+
+export function getAdminMaintenanceRequest(requestId: string) {
+  return apiFetch<MaintenanceRequest>(`/v1/admin/maintenance/requests/${requestId}`, { auth: true });
+}
+
+export function triageMaintenanceRequest(
+  requestId: string,
+  payload: { status: "TRIAGED" | "REJECTED" | "SENT_TO_VENDOR"; note?: string }
+) {
+  return apiFetch<MaintenanceRequest>(`/v1/admin/maintenance/requests/${requestId}/triage`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function assignMaintenancePartner(requestId: string, payload: { partnerId: string; note?: string }) {
+  return apiFetch<MaintenanceRequest>(`/v1/admin/maintenance/requests/${requestId}/assign`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function scheduleMaintenanceRequest(requestId: string, payload: { scheduledAt: string; note?: string }) {
+  return apiFetch<MaintenanceRequest>(`/v1/admin/maintenance/requests/${requestId}/schedule`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function updateMaintenanceRequestStatus(
+  requestId: string,
+  payload: {
+    status: MaintenanceStatus;
+    note?: string;
+    publicSummary?: string;
+    quotedAmount?: number;
+    quotedCurrency?: "USD" | "SYP";
+  }
+) {
+  return apiFetch<MaintenanceRequest>(`/v1/admin/maintenance/requests/${requestId}/status`, {
+    method: "PATCH",
+    auth: true,
+    body: JSON.stringify(payload),
+  });
+}
+
+export function addMaintenanceRequestUpdate(
+  requestId: string,
+  payload: { note: string; isPublic?: boolean }
+) {
+  return apiFetch<MaintenanceRequest>(`/v1/admin/maintenance/requests/${requestId}/updates`, {
+    method: "POST",
+    auth: true,
+    body: JSON.stringify(payload),
   });
 }

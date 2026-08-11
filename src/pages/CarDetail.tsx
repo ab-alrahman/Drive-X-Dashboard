@@ -29,13 +29,14 @@ import {
   addFavoriteCar,
   createLead,
   getCarInspection,
+  getCarMaintenanceHistory,
   getFavoriteCars,
   getPublicCar,
   getPublicCars,
   removeFavoriteCar,
   requestCarInspection,
 } from "@/lib/public-api";
-import type { InspectionCase } from "@/lib/api-types";
+import type { InspectionCase, PublicMaintenanceRecord } from "@/lib/api-types";
 import { submitCarComplaint } from "@/lib/vendors-api";
 import {
   Dialog,
@@ -63,6 +64,7 @@ export default function CarDetail() {
   const [submitError, setSubmitError] = useState("");
   const [favoriteMessage, setFavoriteMessage] = useState("");
   const [inspectionCase, setInspectionCase] = useState<InspectionCase | null>(null);
+  const [maintenanceHistory, setMaintenanceHistory] = useState<PublicMaintenanceRecord[]>([]);
   const [showRequestInspection, setShowRequestInspection] = useState(false);
   const [inspectionIntent, setInspectionIntent] = useState<"BUY" | "RENT">("BUY");
   const [inspectionNotes, setInspectionNotes] = useState("");
@@ -105,6 +107,9 @@ export default function CarDetail() {
     getCarInspection(id)
       .then(setInspectionCase)
       .catch(() => setInspectionCase(null));
+    getCarMaintenanceHistory(id)
+      .then((response) => setMaintenanceHistory(response.items))
+      .catch(() => setMaintenanceHistory([]));
   }, [id]);
 
   const handleRequestInspection = async () => {
@@ -504,6 +509,19 @@ export default function CarDetail() {
                   >
                     Request a Professional Inspection
                   </Button>
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      if (!getCustomerAccessToken()) {
+                        navigate("/login");
+                        return;
+                      }
+                      navigate("/my-dashboard");
+                    }}
+                    className="bg-gold hover:bg-gold-light text-dark shrink-0"
+                  >
+                    Request Maintenance
+                  </Button>
                 </div>
 
                 {inspectionRequestMessage && (
@@ -550,6 +568,35 @@ export default function CarDetail() {
                     ))}
                   </div>
                 )}
+
+                <div className="mt-6 pt-5 border-t border-gold/10">
+                  <h4 className="text-white font-semibold mb-3">Service History</h4>
+                  {maintenanceHistory.length === 0 ? (
+                    <p className="text-white/40 text-sm">No completed Drive X maintenance services yet.</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {maintenanceHistory.map((record) => (
+                        <div key={record.id} className="border border-gold/10 rounded-lg p-3">
+                          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <span className="text-white/70 text-sm">
+                              {record.requestType.replaceAll("_", " ")}
+                              {record.completedAt ? ` - ${new Date(record.completedAt).toLocaleDateString()}` : ""}
+                            </span>
+                            <span className="text-xs px-2 py-1 rounded-full bg-green-500/10 text-green-400">
+                              Drive X verified
+                            </span>
+                          </div>
+                          {record.publicSummary && (
+                            <p className="text-white/50 text-sm mt-2">{record.publicSummary}</p>
+                          )}
+                          {record.partnerName && (
+                            <p className="text-gold text-xs mt-2">Partner: {record.partnerName}</p>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </>
             );
           })()}
