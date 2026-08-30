@@ -5,9 +5,11 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { clearAuthTokens, setAdminSessionProfile } from "@/lib/api";
 import { getCurrentAdmin, loginAdmin } from "@/lib/auth-api";
+import { useI18n } from "@/lib/i18n";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
@@ -19,7 +21,7 @@ export default function AdminLogin() {
     setError("");
 
     if (!email || !password) {
-      setError("Enter your admin email and password.");
+      setError(t("enterAdminEmailPassword"));
       return;
     }
 
@@ -30,7 +32,7 @@ export default function AdminLogin() {
 
       if (admin.role !== "PLATFORM_ADMIN") {
         clearAuthTokens();
-        setError("This portal is only for Drive X Platform Admin accounts. Sellers should use the regular login page.");
+        setError(t("platformAdminOnlyError"));
         return;
       }
 
@@ -42,7 +44,7 @@ export default function AdminLogin() {
       navigate("/dashboard");
     } catch (error) {
       clearAuthTokens();
-      setError(error instanceof Error ? error.message : "Admin login failed.");
+      setError(error instanceof Error ? error.message : t("adminLoginFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -60,22 +62,22 @@ export default function AdminLogin() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold text-white tracking-wider">DRIVE X</span>
-              <span className="text-[10px] text-gold tracking-[0.2em] -mt-1">PLATFORM</span>
+              <span className="text-[10px] text-gold tracking-[0.2em] -mt-1">{t("platform").toUpperCase()}</span>
             </div>
           </Link>
 
           <div>
             <div className="mb-5 inline-flex items-center gap-2 rounded-full border border-gold/30 bg-gold/10 px-4 py-2 text-gold text-sm">
               <ShieldCheck className="h-4 w-4" />
-              Platform administration
+              {t("platformAdministration")}
             </div>
-            <h1 className="text-4xl font-bold text-white mb-4">Drive X Admin Portal</h1>
+            <h1 className="text-4xl font-bold text-white mb-4">{t("driveXAdminPortal")}</h1>
             <p className="text-white/60 text-lg max-w-md">
-              Oversight access for marketplace operations, vendor governance, complaints, and platform-wide workflows.
+              {t("platformAdminPortalDesc")}
             </p>
           </div>
 
-          <p className="text-white/40 text-sm">Seller accounts should sign in from the regular login page.</p>
+          <p className="text-white/40 text-sm">{t("sellerAccountsRegularLogin")}</p>
         </div>
       </div>
 
@@ -83,12 +85,12 @@ export default function AdminLogin() {
         <div className="max-w-md w-full mx-auto">
           <Link to="/" className="inline-flex items-center gap-2 text-white/50 hover:text-gold transition-colors mb-8">
             <ArrowLeft className="w-4 h-4" />
-            Back to home
+            {t("backToHome")}
           </Link>
 
           <div className="mb-8">
-            <h2 className="text-3xl font-bold text-white mb-2">Platform Admin Sign In</h2>
-            <p className="text-white/60">Use this page only for Drive X platform administrator accounts.</p>
+            <h2 className="text-3xl font-bold text-white mb-2">{t("platformAdminSignIn")}</h2>
+            <p className="text-white/60">{t("platformAdminSignInDesc")}</p>
           </div>
 
           <form onSubmit={handleSubmit} className="space-y-5">
@@ -99,7 +101,7 @@ export default function AdminLogin() {
             )}
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Admin email</label>
+              <label className="text-white/70 text-sm font-medium">{t("adminEmail")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
@@ -113,12 +115,12 @@ export default function AdminLogin() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Password</label>
+              <label className="text-white/70 text-sm font-medium">{t("password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
                   type={showPassword ? "text" : "password"}
-                  placeholder="Password"
+                  placeholder={t("passwordPlaceholder")}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
                   className="pl-10 pr-10 bg-dark-card border-gold/20 text-white placeholder:text-white/30 focus:border-gold focus:ring-gold/20"
@@ -143,16 +145,16 @@ export default function AdminLogin() {
               ) : (
                 <>
                   <ShieldCheck className="w-5 h-5 mr-2" />
-                  Sign in as Platform Admin
+                  {t("signInAsPlatformAdmin")}
                 </>
               )}
             </Button>
           </form>
 
           <div className="mt-6 rounded-lg border border-white/10 bg-white/5 p-4 text-sm text-white/60">
-            Seller or dealership account?{" "}
+            {t("sellerOrDealershipAccount")}{" "}
             <Link to="/login" className="text-gold hover:text-gold-light font-medium">
-              Use seller login
+              {t("useSellerLogin")}
             </Link>
             .
           </div>

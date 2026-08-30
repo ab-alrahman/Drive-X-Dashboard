@@ -6,9 +6,11 @@ import { Input } from "@/components/ui/input";
 import { setAdminSessionProfile } from "@/lib/api";
 import { registerVendor } from "@/lib/vendors-api";
 import { getCurrentAdmin } from "@/lib/auth-api";
+import { useI18n } from "@/lib/i18n";
 
 export default function VendorRegister() {
   const navigate = useNavigate();
+  const { t } = useI18n();
   const [formData, setFormData] = useState({
     vendorName: "",
     ownerFullName: "",
@@ -28,11 +30,11 @@ export default function VendorRegister() {
     setError("");
 
     if (formData.ownerPassword !== formData.confirmPassword) {
-      setError("Passwords do not match.");
+      setError(t("passwordsDoNotMatch"));
       return;
     }
     if (formData.ownerPassword.length < 8) {
-      setError("Password must be at least 8 characters.");
+      setError(t("passwordTooShort"));
       return;
     }
 
@@ -52,7 +54,7 @@ export default function VendorRegister() {
       });
       navigate("/dashboard");
     } catch (error) {
-      setError(error instanceof Error ? error.message : "Could not register the dealership.");
+      setError(error instanceof Error ? error.message : t("couldNotRegisterDealership"));
     } finally {
       setIsLoading(false);
     }
@@ -74,22 +76,21 @@ export default function VendorRegister() {
             </div>
             <div className="flex flex-col">
               <span className="text-xl font-bold text-white tracking-wider">DRIVE X</span>
-              <span className="text-[10px] text-gold tracking-[0.2em] -mt-1">MARKET</span>
+              <span className="text-[10px] text-gold tracking-[0.2em] -mt-1">{t("market").toUpperCase()}</span>
             </div>
           </Link>
 
           <div>
-            <h2 className="text-4xl font-bold text-white mb-4">Sell Your Car</h2>
+            <h2 className="text-4xl font-bold text-white mb-4">{t("sellYourCar")}</h2>
             <p className="text-white/60 text-lg max-w-md">
-              Register your dealership and start listing cars on the marketplace. No approval
-              wait - you get full access to your own dashboard immediately.
+              {t("registerDealershipIntro")}
             </p>
           </div>
 
           <div className="flex items-center gap-4 text-white/40 text-sm">
-            <span>Flat platform commission</span>
+            <span>{t("flatPlatformCommission")}</span>
             <span className="w-1 h-1 rounded-full bg-gold" />
-            <span>Own your listings</span>
+            <span>{t("ownYourListings")}</span>
           </div>
         </div>
       </div>
@@ -102,18 +103,18 @@ export default function VendorRegister() {
             className="inline-flex items-center gap-2 text-white/50 hover:text-gold transition-colors mb-8 lg:hidden"
           >
             <ArrowLeft className="w-4 h-4" />
-            Back to home
+            {t("backToHome")}
           </Link>
 
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-2">
               <Building2 className="w-6 h-6 text-gold" />
-              <h1 className="text-3xl font-bold text-white">Register your dealership</h1>
+              <h1 className="text-3xl font-bold text-white">{t("registerYourDealership")}</h1>
             </div>
             <p className="text-white/60">
-              Already registered?{" "}
+              {t("alreadyRegistered")}{" "}
               <Link to="/login" className="text-gold hover:text-gold-light font-medium">
-                Sign in
+                {t("signIn")}
               </Link>
             </p>
           </div>
@@ -126,12 +127,12 @@ export default function VendorRegister() {
             )}
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Dealership / Vendor name</label>
+              <label className="text-white/70 text-sm font-medium">{t("dealershipName")}</label>
               <div className="relative">
                 <Store className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
                   name="vendorName"
-                  placeholder="e.g. Al-Salem Motors"
+                  placeholder={t("dealershipNamePlaceholder")}
                   value={formData.vendorName}
                   onChange={handleChange}
                   className="pl-10 bg-dark-card border-gold/20 text-white placeholder:text-white/30 focus:border-gold focus:ring-gold/20"
@@ -140,12 +141,12 @@ export default function VendorRegister() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Owner full name</label>
+              <label className="text-white/70 text-sm font-medium">{t("ownerFullName")}</label>
               <div className="relative">
                 <User className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
                   name="ownerFullName"
-                  placeholder="John Doe"
+                  placeholder={t("ownerFullNamePlaceholder")}
                   value={formData.ownerFullName}
                   onChange={handleChange}
                   className="pl-10 bg-dark-card border-gold/20 text-white placeholder:text-white/30 focus:border-gold focus:ring-gold/20"
@@ -154,7 +155,7 @@ export default function VendorRegister() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Owner email</label>
+              <label className="text-white/70 text-sm font-medium">{t("ownerEmail")}</label>
               <div className="relative">
                 <Mail className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
@@ -169,13 +170,13 @@ export default function VendorRegister() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Password</label>
+              <label className="text-white/70 text-sm font-medium">{t("password")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
                   type="password"
                   name="ownerPassword"
-                  placeholder="Minimum 8 characters"
+                  placeholder={t("passwordMinPlaceholder")}
                   value={formData.ownerPassword}
                   onChange={handleChange}
                   className="pl-10 bg-dark-card border-gold/20 text-white placeholder:text-white/30 focus:border-gold focus:ring-gold/20"
@@ -184,13 +185,13 @@ export default function VendorRegister() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-white/70 text-sm font-medium">Confirm password</label>
+              <label className="text-white/70 text-sm font-medium">{t("confirmPassword")}</label>
               <div className="relative">
                 <Lock className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-white/30" />
                 <Input
                   type="password"
                   name="confirmPassword"
-                  placeholder="Repeat password"
+                  placeholder={t("repeatPassword")}
                   value={formData.confirmPassword}
                   onChange={handleChange}
                   className="pl-10 bg-dark-card border-gold/20 text-white placeholder:text-white/30 focus:border-gold focus:ring-gold/20"
@@ -208,7 +209,7 @@ export default function VendorRegister() {
               ) : (
                 <>
                   <Building2 className="w-5 h-5 mr-2" />
-                  Register Dealership
+                  {t("registerDealershipButton")}
                 </>
               )}
             </Button>

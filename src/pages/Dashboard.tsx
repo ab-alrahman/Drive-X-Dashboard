@@ -103,6 +103,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { useI18n } from "@/lib/i18n";
 
 const emptyReportFinding = { description: "", severity: "MINOR" as InspectionFindingSeverity, costAmount: "" };
 
@@ -142,8 +143,197 @@ const emptyDealForm = {
   notes: "",
 };
 
+const dashboardText = {
+  en: {
+    overview: "Overview",
+    cars: "My Cars",
+    inquiries: "Inquiries",
+    deals: "Deals",
+    inspections: "Inspections",
+    maintenance: "Maintenance",
+    favorites: "Favorites",
+    analytics: "Analytics",
+    settings: "Settings",
+    marketplaceOversight: "Marketplace Oversight",
+    adminUser: "Admin User",
+    admin: "Admin",
+    logout: "Logout",
+    welcomeBack: "Welcome back",
+    search: "Search...",
+    recentInquiries: "Recent Inquiries",
+    recentListings: "Recent Listings",
+    viewAll: "View All",
+    quickActions: "Quick Actions",
+    browseInventory: "Browse Inventory",
+    addNewCar: "Add New Car",
+    viewMessages: "View Messages",
+    searchCars: "Search cars...",
+    car: "Car",
+    category: "Category",
+    price: "Price",
+    status: "Status",
+    rating: "Rating",
+    actions: "Actions",
+    customer: "Customer",
+    interestedIn: "Interested In",
+    date: "Date",
+    type: "Type",
+    finalPrice: "Final Price",
+    commission: "Commission",
+    createDeal: "Create Deal",
+    createDealHint: "Create a deal from an approved lead to mark a sale/rental as closed and record commission.",
+    noDeals: "No deals yet. Approve a lead first, then create a deal for it.",
+    inspectionHint: "Every car needs an accepted maintenance file or certified inspection before it can be published as Available or Reserved. Click the shield icon on a car (in My Cars) to manage it, or pick one here.",
+    action: "Action",
+    manage: "Manage",
+    manageInspection: "Manage Inspection",
+    technicianNetwork: "Technician Partner Network",
+    addTechnician: "Add Technician",
+    name: "Name",
+    city: "City",
+    tiers: "Tiers",
+    specialty: "Specialty",
+    active: "Active",
+    inactive: "Inactive",
+    noTechnicians: "No technicians yet. Add your first partner to start scheduling inspections.",
+    maintenanceRequests: "Maintenance Requests",
+    maintenanceHint: "Coordinate customer maintenance for Drive X cars. Rental requests stay under platform review before vendors can act.",
+    refresh: "Refresh",
+    customerCar: "Customer / Car",
+    vendor: "Vendor",
+    rentalFlow: "Rental flow",
+    monthlySalesOverview: "Monthly Sales Overview",
+    profileSettings: "Profile Settings",
+    fullName: "Full Name",
+    email: "Email",
+    emailCannotBeChanged: "Email cannot be changed.",
+    notificationPreferences: "Notification Preferences",
+    vendors: "Vendors",
+    listings: "Listings",
+    openComplaints: "Open Complaints",
+    customerComplaints: "Customer Complaints",
+    complaint: "Complaint",
+    hiddenByPlatform: "Hidden by platform",
+    restoreMarketplace: "Restore to marketplace",
+    hideMarketplace: "Hide from marketplace",
+  },
+  ar: {
+    overview: "نظرة عامة",
+    cars: "سياراتي",
+    inquiries: "الطلبات",
+    deals: "الصفقات",
+    inspections: "الفحوصات",
+    maintenance: "الصيانة",
+    favorites: "المفضلة",
+    analytics: "التحليلات",
+    settings: "الإعدادات",
+    marketplaceOversight: "إشراف المنصة",
+    adminUser: "مدير النظام",
+    admin: "المدير",
+    logout: "تسجيل الخروج",
+    welcomeBack: "مرحباً بعودتك",
+    search: "بحث...",
+    recentInquiries: "أحدث الطلبات",
+    recentListings: "أحدث العروض",
+    viewAll: "عرض الكل",
+    quickActions: "إجراءات سريعة",
+    browseInventory: "تصفح السيارات",
+    addNewCar: "إضافة سيارة",
+    viewMessages: "عرض الرسائل",
+    searchCars: "ابحث في السيارات...",
+    car: "السيارة",
+    category: "الفئة",
+    price: "السعر",
+    status: "الحالة",
+    rating: "التقييم",
+    actions: "الإجراءات",
+    customer: "العميل",
+    interestedIn: "السيارة المطلوبة",
+    date: "التاريخ",
+    type: "النوع",
+    finalPrice: "السعر النهائي",
+    commission: "العمولة",
+    createDeal: "إنشاء صفقة",
+    createDealHint: "أنشئ صفقة من طلب مقبول لإغلاق عملية بيع أو إيجار وتسجيل العمولة.",
+    noDeals: "لا توجد صفقات بعد. اقبل طلباً أولاً ثم أنشئ صفقة له.",
+    inspectionHint: "كل سيارة تحتاج ملف صيانة مقبولاً أو فحصاً معتمداً قبل نشرها كمتاحة أو محجوزة. اضغط أيقونة الدرع في سياراتي لإدارتها، أو اختر سيارة من هنا.",
+    action: "إجراء",
+    manage: "إدارة",
+    manageInspection: "إدارة الفحص",
+    technicianNetwork: "شبكة فنيي الفحص",
+    addTechnician: "إضافة فني",
+    name: "الاسم",
+    city: "المدينة",
+    tiers: "الباقات",
+    specialty: "الاختصاص",
+    active: "نشط",
+    inactive: "غير نشط",
+    noTechnicians: "لا يوجد فنيون بعد. أضف أول شريك لبدء جدولة الفحوصات.",
+    maintenanceRequests: "طلبات الصيانة",
+    maintenanceHint: "نسّق صيانة العملاء لسيارات Drive X. طلبات الإيجار تبقى تحت مراجعة المنصة قبل أن يتعامل معها البائعون.",
+    refresh: "تحديث",
+    customerCar: "العميل / السيارة",
+    vendor: "البائع",
+    rentalFlow: "مسار الإيجار",
+    monthlySalesOverview: "نظرة شهرية على المبيعات",
+    profileSettings: "إعدادات الحساب",
+    fullName: "الاسم الكامل",
+    email: "البريد الإلكتروني",
+    emailCannotBeChanged: "لا يمكن تغيير البريد الإلكتروني.",
+    notificationPreferences: "تفضيلات الإشعارات",
+    vendors: "البائعون",
+    listings: "العروض",
+    openComplaints: "الشكاوى المفتوحة",
+    customerComplaints: "شكاوى العملاء",
+    complaint: "الشكوى",
+    hiddenByPlatform: "مخفية من المنصة",
+    restoreMarketplace: "إعادتها إلى السوق",
+    hideMarketplace: "إخفاؤها من السوق",
+  },
+} as const;
+
+type DashboardTextKey = keyof typeof dashboardText.en;
+
 export default function Dashboard() {
   const navigate = useNavigate();
+  const { language } = useI18n();
+  const dt = (key: DashboardTextKey) => dashboardText[language][key];
+  const dl = (en: string, ar: string) => (language === "ar" ? ar : en);
+  const enumLabel = (value: string) => {
+    const labels: Record<string, string> = {
+      SALE: "بيع",
+      RENT: "إيجار",
+      BOTH: "بيع وإيجار",
+      NEW: "جديدة",
+      USED: "مستعملة",
+      AUTOMATIC: "أوتوماتيك",
+      MANUAL: "يدوي",
+      AVAILABLE: "متاحة",
+      RESERVED: "محجوزة",
+      SOLD: "مباعة",
+      RENTED: "مؤجرة",
+      INACTIVE: "غير نشطة",
+      GASOLINE: "بنزين",
+      DIESEL: "ديزل",
+      HYBRID: "هجينة",
+      ELECTRIC: "كهربائية",
+      MINOR: "بسيط",
+      MODERATE: "متوسط",
+      SEVERE: "كبير",
+      SAFETY_CRITICAL: "مؤثر على السلامة",
+      SELLER: "البائع",
+      BUYER: "المشتري",
+      RENTER: "المستأجر",
+      DRIVEX: "Drive X",
+      QUICK: "سريع",
+      COMPREHENSIVE: "شامل",
+      OPEN: "مفتوحة",
+      DISMISSED: "مرفوضة",
+      SUBSTANTIATED: "مثبتة",
+      RESOLVED: "محلولة",
+    };
+    return language === "ar" ? labels[value] ?? value.replaceAll("_", " ") : value.replaceAll("_", " ");
+  };
   const [activeTab, setActiveTab] = useState("overview");
   const [user, setUser] = useState<{ name: string; email: string; role?: string } | null>(null);
   const [isPlatformAdmin, setIsPlatformAdmin] = useState(false);
@@ -219,7 +409,7 @@ export default function Dashboard() {
 
     getCurrentAdmin()
       .then((admin) => {
-        setUser({ name: admin.fullName ?? "Admin User", email: admin.email, role: admin.role });
+        setUser({ name: admin.fullName ?? dt("adminUser"), email: admin.email, role: admin.role });
         setProfileNameInput(admin.fullName ?? "");
         setIsPlatformAdmin(admin.role === "PLATFORM_ADMIN");
       })
@@ -234,7 +424,7 @@ export default function Dashboard() {
     setIsSavingProfile(true);
     try {
       const admin = await updateAdminProfile(profileNameInput.trim());
-      setUser({ name: admin.fullName ?? "Admin User", email: admin.email });
+      setUser({ name: admin.fullName ?? dt("adminUser"), email: admin.email });
       setActionMessage("Profile updated successfully.");
     } catch (error) {
       setActionMessage(error instanceof Error ? error.message : "Could not update profile.");
@@ -932,17 +1122,17 @@ export default function Dashboard() {
   });
 
   const sidebarItems = [
-    { id: "overview", label: "Overview", icon: LayoutDashboard },
-    { id: "cars", label: "My Cars", icon: Car },
-    { id: "inquiries", label: "Inquiries", icon: MessageSquare },
-    { id: "deals", label: "Deals", icon: Handshake },
-    { id: "inspections", label: "Inspections", icon: ShieldCheck },
-    { id: "maintenance", label: "Maintenance", icon: Wrench },
-    { id: "favorites", label: "Favorites", icon: Heart },
-    { id: "analytics", label: "Analytics", icon: TrendingUp },
-    { id: "settings", label: "Settings", icon: Settings },
+    { id: "overview", label: dt("overview"), icon: LayoutDashboard },
+    { id: "cars", label: dt("cars"), icon: Car },
+    { id: "inquiries", label: dt("inquiries"), icon: MessageSquare },
+    { id: "deals", label: dt("deals"), icon: Handshake },
+    { id: "inspections", label: dt("inspections"), icon: ShieldCheck },
+    { id: "maintenance", label: dt("maintenance"), icon: Wrench },
+    { id: "favorites", label: dt("favorites"), icon: Heart },
+    { id: "analytics", label: dt("analytics"), icon: TrendingUp },
+    { id: "settings", label: dt("settings"), icon: Settings },
     ...(isPlatformAdmin
-      ? [{ id: "vendors", label: "Marketplace Oversight", icon: ShieldAlert }]
+      ? [{ id: "vendors", label: dt("marketplaceOversight"), icon: ShieldAlert }]
       : []),
   ];
 
@@ -956,10 +1146,10 @@ export default function Dashboard() {
               {/* User Info */}
               <div className="flex items-center gap-3 p-3 mb-4 border-b border-gold/10">
                 <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center text-dark font-bold text-lg">
-                  {user?.name?.charAt(0) || "A"}
+                  {user?.name?.charAt(0) || dt("admin").charAt(0)}
                 </div>
                 <div className="min-w-0">
-                  <p className="text-white font-semibold truncate">{user?.name || "Admin User"}</p>
+                  <p className="text-white font-semibold truncate">{user?.name || dt("adminUser")}</p>
                   <p className="text-gold text-xs truncate">{user?.email || "admin@drivex.com"}</p>
                 </div>
               </div>
@@ -988,7 +1178,7 @@ export default function Dashboard() {
                   className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium text-red-400 hover:text-red-300 hover:bg-red-500/10 transition-all"
                 >
                   <LogOut className="w-5 h-5" />
-                  Logout
+                  {dt("logout")}
                 </button>
               </div>
             </div>
@@ -1000,17 +1190,17 @@ export default function Dashboard() {
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-8">
               <div>
                 <h1 className="text-2xl md:text-3xl font-bold text-white capitalize">
-                  {activeTab}
+                  {sidebarItems.find((item) => item.id === activeTab)?.label ?? activeTab}
                 </h1>
                 <p className="text-white/50 text-sm mt-1">
-                  Welcome back, {user?.name?.split(" ")[0] || "Admin"}
+                  {dt("welcomeBack")}, {user?.name?.split(" ")[0] || dt("admin")}
                 </p>
               </div>
               <div className="flex items-center gap-3">
                 <div className="relative">
                   <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                   <Input
-                    placeholder="Search..."
+                    placeholder={dt("search")}
                     className="pl-9 bg-dark-card border-gold/20 text-white placeholder:text-white/30 w-48"
                   />
                 </div>
@@ -1071,14 +1261,14 @@ export default function Dashboard() {
                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                   <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-white font-bold text-lg">Recent Inquiries</h3>
+                      <h3 className="text-white font-bold text-lg">{dt("recentInquiries")}</h3>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setActiveTab("inquiries")}
                         className="text-gold hover:text-gold-light hover:bg-gold/10"
                       >
-                        View All
+                        {dt("viewAll")}
                         <ChevronRight className="w-4 h-4 ml-1" />
                       </Button>
                     </div>
@@ -1112,14 +1302,14 @@ export default function Dashboard() {
 
                   <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
                     <div className="flex items-center justify-between mb-6">
-                      <h3 className="text-white font-bold text-lg">Recent Listings</h3>
+                      <h3 className="text-white font-bold text-lg">{dt("recentListings")}</h3>
                       <Button
                         variant="ghost"
                         size="sm"
                         onClick={() => setActiveTab("cars")}
                         className="text-gold hover:text-gold-light hover:bg-gold/10"
                       >
-                        View All
+                        {dt("viewAll")}
                         <ChevronRight className="w-4 h-4 ml-1" />
                       </Button>
                     </div>
@@ -1156,7 +1346,7 @@ export default function Dashboard() {
 
                 {/* Quick Actions */}
                 <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
-                  <h3 className="text-white font-bold text-lg mb-4">Quick Actions</h3>
+                  <h3 className="text-white font-bold text-lg mb-4">{dt("quickActions")}</h3>
                   <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
                     <Link to="/inventory">
                       <Button
@@ -1164,7 +1354,7 @@ export default function Dashboard() {
                         className="w-full h-24 border-gold/20 hover:border-gold/50 hover:bg-gold/5 flex flex-col items-center gap-2"
                       >
                         <Car className="w-6 h-6 text-gold" />
-                        <span className="text-white/70 text-sm">Browse Inventory</span>
+                        <span className="text-white/70 text-sm">{dt("browseInventory")}</span>
                       </Button>
                     </Link>
                     <Button
@@ -1173,7 +1363,7 @@ export default function Dashboard() {
                       className="w-full h-24 border-gold/20 hover:border-gold/50 hover:bg-gold/5 flex flex-col items-center gap-2"
                     >
                       <Plus className="w-6 h-6 text-gold" />
-                      <span className="text-white/70 text-sm">Add New Car</span>
+                      <span className="text-white/70 text-sm">{dt("addNewCar")}</span>
                     </Button>
                     <Button
                       variant="outline"
@@ -1181,7 +1371,7 @@ export default function Dashboard() {
                       className="w-full h-24 border-gold/20 hover:border-gold/50 hover:bg-gold/5 flex flex-col items-center gap-2"
                     >
                       <MessageSquare className="w-6 h-6 text-gold" />
-                      <span className="text-white/70 text-sm">View Messages</span>
+                      <span className="text-white/70 text-sm">{dt("viewMessages")}</span>
                     </Button>
                   </div>
                 </div>
@@ -1195,7 +1385,7 @@ export default function Dashboard() {
                   <div className="relative">
                     <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30" />
                     <Input
-                      placeholder="Search cars..."
+                      placeholder={dt("searchCars")}
                       value={carSearch}
                       onChange={(event) => setCarSearch(event.target.value)}
                       className="pl-9 bg-dark-card border-gold/20 text-white placeholder:text-white/30 w-64"
@@ -1203,7 +1393,7 @@ export default function Dashboard() {
                   </div>
                   <Button onClick={openCreateCar} className="bg-gold hover:bg-gold-light text-dark">
                     <Plus className="w-4 h-4 mr-2" />
-                    Add New Car
+                    {dt("addNewCar")}
                   </Button>
                 </div>
 
@@ -1212,12 +1402,12 @@ export default function Dashboard() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gold/10">
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Car</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Category</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Price</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Rating</th>
-                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("car")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("category")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("price")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("status")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("rating")}</th>
+                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("actions")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1231,7 +1421,7 @@ export default function Dashboard() {
                                   <p className="text-white/50 text-xs">{car.year}</p>
                                   {car.hiddenByPlatform && (
                                     <span className="text-[10px] px-1.5 py-0.5 rounded bg-red-500/10 text-red-400 inline-block mt-1" title={car.hiddenReason}>
-                                      Hidden by platform
+                                      {dt("hiddenByPlatform")}
                                     </span>
                                   )}
                                 </div>
@@ -1265,7 +1455,7 @@ export default function Dashboard() {
                                   variant="ghost"
                                   size="sm"
                                   onClick={() => openInspectionDialog(car.id)}
-                                  title="Manage Inspection"
+                                  title={dt("manageInspection")}
                                   className="text-gold hover:bg-gold/10 h-8 w-8 p-0"
                                 >
                                   <ShieldCheck className="w-4 h-4" />
@@ -1283,7 +1473,7 @@ export default function Dashboard() {
                                     variant="ghost"
                                     size="sm"
                                     onClick={() => handleToggleCarHidden(car)}
-                                    title={car.hiddenByPlatform ? "Restore to marketplace" : "Hide from marketplace"}
+                                    title={car.hiddenByPlatform ? dt("restoreMarketplace") : dt("hideMarketplace")}
                                     className="text-white/50 hover:text-white hover:bg-white/10 h-8 w-8 p-0"
                                   >
                                     {car.hiddenByPlatform ? <Eye className="w-4 h-4" /> : <EyeOff className="w-4 h-4" />}
@@ -1316,11 +1506,11 @@ export default function Dashboard() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gold/10">
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Customer</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Interested In</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Date</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
-                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("customer")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("interestedIn")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("date")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("status")}</th>
+                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("actions")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1388,7 +1578,7 @@ export default function Dashboard() {
               <div className="space-y-6">
                 <div className="flex items-center justify-between">
                   <p className="text-white/50 text-sm">
-                    Create a deal from an approved lead to mark a sale/rental as closed and record commission.
+                    {dt("createDealHint")}
                   </p>
                   <Button
                     onClick={openCreateDeal}
@@ -1396,7 +1586,7 @@ export default function Dashboard() {
                     className="bg-gold hover:bg-gold-light text-dark shrink-0"
                   >
                     <Plus className="w-4 h-4 mr-2" />
-                    Create Deal
+                    {dt("createDeal")}
                   </Button>
                 </div>
 
@@ -1405,12 +1595,12 @@ export default function Dashboard() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gold/10">
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Car</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Type</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Final Price</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Commission</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Date</th>
-                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("car")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("type")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("finalPrice")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("commission")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("date")}</th>
+                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("actions")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1457,7 +1647,7 @@ export default function Dashboard() {
                         {deals.length === 0 && (
                           <tr>
                             <td colSpan={6} className="px-4 py-8 text-center text-white/40 text-sm">
-                              No deals yet. Approve a lead first, then create a deal for it.
+                              {dt("noDeals")}
                             </td>
                           </tr>
                         )}
@@ -1473,18 +1663,16 @@ export default function Dashboard() {
               <div className="space-y-8">
                 <div>
                   <p className="text-white/50 text-sm mb-4">
-                    Every car needs an accepted maintenance file or certified inspection before it can be
-                    published as Available or Reserved. Click the shield icon on a car (in My Cars) to manage it,
-                    or pick one here.
+                    {dt("inspectionHint")}
                   </p>
                   <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
                     <div className="overflow-x-auto">
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gold/10">
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Car</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
-                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Action</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("car")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("status")}</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("action")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1508,7 +1696,7 @@ export default function Dashboard() {
                                   className="text-gold hover:bg-gold/10"
                                 >
                                   <ShieldCheck className="w-4 h-4 mr-2" />
-                                  Manage
+                                  {dt("manage")}
                                 </Button>
                               </td>
                             </tr>
@@ -1521,10 +1709,10 @@ export default function Dashboard() {
 
                 <div>
                   <div className="flex items-center justify-between mb-4">
-                    <h3 className="text-white font-bold text-lg">Technician Partner Network</h3>
+                    <h3 className="text-white font-bold text-lg">{dt("technicianNetwork")}</h3>
                     <Button onClick={openCreateTechnician} className="bg-gold hover:bg-gold-light text-dark">
                       <Plus className="w-4 h-4 mr-2" />
-                      Add Technician
+                      {dt("addTechnician")}
                     </Button>
                   </div>
                   <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
@@ -1532,12 +1720,12 @@ export default function Dashboard() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gold/10">
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Name</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">City</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Tiers</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Specialty</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Active</th>
-                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("name")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("city")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("tiers")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("specialty")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("active")}</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("actions")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -1554,7 +1742,7 @@ export default function Dashboard() {
                                     technician.isActive ? "bg-green-500/10 text-green-400" : "bg-white/10 text-white/40"
                                   }`}
                                 >
-                                  {technician.isActive ? "Active" : "Inactive"}
+                                  {technician.isActive ? dt("active") : dt("inactive")}
                                 </button>
                               </td>
                               <td className="px-4 py-3 text-right">
@@ -1572,7 +1760,7 @@ export default function Dashboard() {
                           {technicians.length === 0 && (
                             <tr>
                               <td colSpan={6} className="px-4 py-8 text-center text-white/40 text-sm">
-                                No technicians yet. Add your first partner to start scheduling inspections.
+                                {dt("noTechnicians")}
                               </td>
                             </tr>
                           )}
@@ -1588,9 +1776,9 @@ export default function Dashboard() {
               <div className="space-y-6">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                   <div>
-                    <h3 className="text-white font-bold text-lg">Maintenance Requests</h3>
+                    <h3 className="text-white font-bold text-lg">{dt("maintenanceRequests")}</h3>
                     <p className="text-white/50 text-sm mt-1">
-                      Coordinate customer maintenance for Drive X cars. Rental requests stay under platform review before vendors can act.
+                      {dt("maintenanceHint")}
                     </p>
                   </div>
                   <Button
@@ -1598,7 +1786,7 @@ export default function Dashboard() {
                     onClick={() => refreshDashboardData().catch((error: Error) => setDashboardError(error.message))}
                     className="border-gold/30 text-gold hover:bg-gold/10"
                   >
-                    Refresh
+                    {dt("refresh")}
                   </Button>
                 </div>
 
@@ -1607,11 +1795,11 @@ export default function Dashboard() {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gold/10">
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Customer / Car</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Type</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
-                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Vendor</th>
-                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("customerCar")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("type")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("status")}</th>
+                          <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("vendor")}</th>
+                          <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("actions")}</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -1631,7 +1819,7 @@ export default function Dashboard() {
                                   {request.status.replaceAll("_", " ")}
                                 </span>
                                 {request.dealType === "RENT" && (
-                                  <p className="text-orange-400 text-xs mt-2">Rental flow</p>
+                                  <p className="text-orange-400 text-xs mt-2">{dt("rentalFlow")}</p>
                                 )}
                               </td>
                               <td className="px-4 py-3 text-white/60 text-sm">
@@ -1823,7 +2011,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
-                  <h3 className="text-white font-bold text-lg mb-6">Monthly Sales Overview</h3>
+                  <h3 className="text-white font-bold text-lg mb-6">{dt("monthlySalesOverview")}</h3>
                   <div className="space-y-4">
                     {[
                       { month: "January", sales: 18, target: 20 },
@@ -1855,11 +2043,11 @@ export default function Dashboard() {
             {activeTab === "settings" && (
               <div className="space-y-6">
                 <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
-                  <h3 className="text-white font-bold text-lg mb-6">Profile Settings</h3>
+                  <h3 className="text-white font-bold text-lg mb-6">{dt("profileSettings")}</h3>
                   <div className="space-y-4">
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
-                        <label className="text-white/60 text-sm mb-2 block">Full Name</label>
+                        <label className="text-white/60 text-sm mb-2 block">{dt("fullName")}</label>
                         <Input
                           value={profileNameInput}
                           onChange={(e) => setProfileNameInput(e.target.value)}
@@ -1867,13 +2055,13 @@ export default function Dashboard() {
                         />
                       </div>
                       <div>
-                        <label className="text-white/60 text-sm mb-2 block">Email</label>
+                        <label className="text-white/60 text-sm mb-2 block">{dt("email")}</label>
                         <Input
                           value={user?.email || ""}
                           disabled
                           className="bg-dark border-gold/20 text-white/50 cursor-not-allowed"
                         />
-                        <p className="text-white/30 text-xs mt-1">Email cannot be changed.</p>
+                        <p className="text-white/30 text-xs mt-1">{dt("emailCannotBeChanged")}</p>
                       </div>
                     </div>
                     <Button
@@ -1887,7 +2075,7 @@ export default function Dashboard() {
                 </div>
 
                 <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
-                  <h3 className="text-white font-bold text-lg mb-6">Notification Preferences</h3>
+                  <h3 className="text-white font-bold text-lg mb-6">{dt("notificationPreferences")}</h3>
                   <div className="space-y-4">
                     {[
                       { label: "New Inquiries", desc: "Get notified when a new inquiry is received" },
@@ -1915,7 +2103,7 @@ export default function Dashboard() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-white font-bold text-lg">Vendors</h3>
+                      <h3 className="text-white font-bold text-lg">{dt("vendors")}</h3>
                       <p className="text-white/50 text-sm mt-1">
                         Tiered oversight: vendors flagged for fraud are monitored; suspending a vendor hides
                         their listings from the public marketplace.
@@ -1930,11 +2118,11 @@ export default function Dashboard() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gold/10">
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Vendor</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Listings</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Open Complaints</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
-                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("vendor")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("listings")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("openComplaints")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("status")}</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("actions")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2004,7 +2192,7 @@ export default function Dashboard() {
                 <div>
                   <div className="flex items-center justify-between mb-4">
                     <div>
-                      <h3 className="text-white font-bold text-lg">Customer Complaints</h3>
+                      <h3 className="text-white font-bold text-lg">{dt("customerComplaints")}</h3>
                       <p className="text-white/50 text-sm mt-1">
                         Substantiate a complaint to count toward auto-flagging. 3+ substantiated complaints
                         in 30 days auto-flags the vendor.
@@ -2019,12 +2207,12 @@ export default function Dashboard() {
                       <table className="w-full">
                         <thead>
                           <tr className="border-b border-gold/10">
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Car</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Vendor</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Customer</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Complaint</th>
-                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">Status</th>
-                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">Actions</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("car")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("vendor")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("customer")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("complaint")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("status")}</th>
+                            <th className="text-right text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("actions")}</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -2061,7 +2249,7 @@ export default function Dashboard() {
                                     onClick={() => openReviewComplaint(complaint)}
                                     className="text-gold hover:bg-gold/10"
                                   >
-                                    Review
+                                    {dl("Review", "مراجعة")}
                                   </Button>
                                 ) : (
                                   <span className="text-white/30 text-xs">{complaint.reviewNote}</span>
@@ -2072,7 +2260,7 @@ export default function Dashboard() {
                           {complaints.length === 0 && (
                             <tr>
                               <td colSpan={6} className="px-4 py-8 text-center text-white/40 text-sm">
-                                No customer complaints yet.
+                                {dl("No customer complaints yet.", "لا توجد شكاوى عملاء حتى الآن.")}
                               </td>
                             </tr>
                           )}
@@ -2091,59 +2279,59 @@ export default function Dashboard() {
         <DialogContent className="bg-dark-card border-gold/30 max-w-3xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">
-              {editingCarId ? "Edit Car" : "Add New Car"}
+              {editingCarId ? dl("Edit Car", "تعديل السيارة") : dt("addNewCar")}
             </DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <Input
-              placeholder="Brand"
+              placeholder={dl("Brand", "العلامة")}
               value={carForm.brand}
               onChange={(event) => setCarForm({ ...carForm, brand: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
-              placeholder="Model"
+              placeholder={dl("Model", "الطراز")}
               value={carForm.model}
               onChange={(event) => setCarForm({ ...carForm, model: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
               type="number"
-              placeholder="Year"
+              placeholder={dl("Year", "السنة")}
               value={carForm.year}
               onChange={(event) => setCarForm({ ...carForm, year: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
               type="number"
-              placeholder="Sale price USD"
+              placeholder={dl("Sale price USD", "سعر البيع بالدولار")}
               value={carForm.salePriceAmount}
               onChange={(event) => setCarForm({ ...carForm, salePriceAmount: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
               type="number"
-              placeholder="Daily rent USD"
+              placeholder={dl("Daily rent USD", "الإيجار اليومي بالدولار")}
               value={carForm.dailyRentPriceAmount}
               onChange={(event) => setCarForm({ ...carForm, dailyRentPriceAmount: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
               type="number"
-              placeholder="Monthly rent USD"
+              placeholder={dl("Monthly rent USD", "الإيجار الشهري بالدولار")}
               value={carForm.monthlyRentPriceAmount}
               onChange={(event) => setCarForm({ ...carForm, monthlyRentPriceAmount: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Select value={carForm.listingType} onValueChange={(value) => setCarForm({ ...carForm, listingType: value })}>
               <SelectTrigger className="bg-dark border-gold/20 text-white">
-                <SelectValue placeholder="Listing type" />
+                <SelectValue placeholder={dl("Listing type", "نوع العرض")} />
               </SelectTrigger>
               <SelectContent className="bg-dark-card border-gold/20">
-                <SelectItem value="SALE">SALE</SelectItem>
-                <SelectItem value="RENT">RENT</SelectItem>
-                <SelectItem value="BOTH">BOTH</SelectItem>
+                <SelectItem value="SALE">{enumLabel("SALE")}</SelectItem>
+                <SelectItem value="RENT">{enumLabel("RENT")}</SelectItem>
+                <SelectItem value="BOTH">{enumLabel("BOTH")}</SelectItem>
               </SelectContent>
             </Select>
             <div>
@@ -2153,89 +2341,89 @@ export default function Dashboard() {
                 disabled={!editingCarId}
               >
                 <SelectTrigger className="bg-dark border-gold/20 text-white disabled:opacity-50">
-                  <SelectValue placeholder="Status" />
+                  <SelectValue placeholder={dt("status")} />
                 </SelectTrigger>
                 <SelectContent className="bg-dark-card border-gold/20">
                   {["AVAILABLE", "RESERVED", "SOLD", "RENTED", "INACTIVE"].map((status) => (
-                    <SelectItem key={status} value={status}>{status}</SelectItem>
+                    <SelectItem key={status} value={status}>{enumLabel(status)}</SelectItem>
                   ))}
                 </SelectContent>
               </Select>
               {!editingCarId && (
                 <p className="text-white/30 text-xs mt-1">
-                  New cars start Inactive - add a maintenance inspection to publish them.
+                  {dl("New cars start Inactive - add a maintenance inspection to publish them.", "السيارات الجديدة تبدأ كغير نشطة. أضف ملف صيانة أو فحصاً لنشرها.")}
                 </p>
               )}
             </div>
             <Select value={carForm.condition} onValueChange={(value) => setCarForm({ ...carForm, condition: value })}>
               <SelectTrigger className="bg-dark border-gold/20 text-white">
-                <SelectValue placeholder="Condition" />
+                <SelectValue placeholder={dl("Condition", "الحالة")} />
               </SelectTrigger>
               <SelectContent className="bg-dark-card border-gold/20">
-                <SelectItem value="NEW">NEW</SelectItem>
-                <SelectItem value="USED">USED</SelectItem>
+                <SelectItem value="NEW">{enumLabel("NEW")}</SelectItem>
+                <SelectItem value="USED">{enumLabel("USED")}</SelectItem>
               </SelectContent>
             </Select>
             <Select value={carForm.fuelType} onValueChange={(value) => setCarForm({ ...carForm, fuelType: value })}>
               <SelectTrigger className="bg-dark border-gold/20 text-white">
-                <SelectValue placeholder="Fuel type" />
+                <SelectValue placeholder={dl("Fuel type", "نوع الوقود")} />
               </SelectTrigger>
               <SelectContent className="bg-dark-card border-gold/20">
                 {["GASOLINE", "DIESEL", "HYBRID", "ELECTRIC"].map((fuel) => (
-                  <SelectItem key={fuel} value={fuel}>{fuel}</SelectItem>
+                  <SelectItem key={fuel} value={fuel}>{enumLabel(fuel)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
             <Select value={carForm.transmission} onValueChange={(value) => setCarForm({ ...carForm, transmission: value })}>
               <SelectTrigger className="bg-dark border-gold/20 text-white">
-                <SelectValue placeholder="Transmission" />
+                <SelectValue placeholder={dl("Transmission", "ناقل الحركة")} />
               </SelectTrigger>
               <SelectContent className="bg-dark-card border-gold/20">
-                <SelectItem value="AUTOMATIC">AUTOMATIC</SelectItem>
-                <SelectItem value="MANUAL">MANUAL</SelectItem>
+                <SelectItem value="AUTOMATIC">{enumLabel("AUTOMATIC")}</SelectItem>
+                <SelectItem value="MANUAL">{enumLabel("MANUAL")}</SelectItem>
               </SelectContent>
             </Select>
             <Input
               type="number"
-              placeholder="Mileage km"
+              placeholder={dl("Mileage km", "المسافة بالكيلومتر")}
               value={carForm.mileageKm}
               onChange={(event) => setCarForm({ ...carForm, mileageKm: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
-              placeholder="Color"
+              placeholder={dl("Color", "اللون")}
               value={carForm.color}
               onChange={(event) => setCarForm({ ...carForm, color: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
-              placeholder="City"
+              placeholder={dl("City", "المدينة")}
               value={carForm.city}
               onChange={(event) => setCarForm({ ...carForm, city: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
-              placeholder="Engine"
+              placeholder={dl("Engine", "المحرك")}
               value={carForm.engine}
               onChange={(event) => setCarForm({ ...carForm, engine: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
               type="number"
-              placeholder="Seats"
+              placeholder={dl("Seats", "عدد المقاعد")}
               value={carForm.seats}
               onChange={(event) => setCarForm({ ...carForm, seats: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
               type="number"
-              placeholder="Horsepower"
+              placeholder={dl("Horsepower", "القوة الحصانية")}
               value={carForm.horsepower}
               onChange={(event) => setCarForm({ ...carForm, horsepower: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <Textarea
-              placeholder="Description"
+              placeholder={dl("Description", "الوصف")}
               value={carForm.description}
               onChange={(event) => setCarForm({ ...carForm, description: event.target.value })}
               className="sm:col-span-2 bg-dark border-gold/20 text-white min-h-28"
@@ -2248,14 +2436,14 @@ export default function Dashboard() {
               onClick={() => setCarDialogOpen(false)}
               className="border-gold/30 text-gold hover:bg-gold/10"
             >
-              Cancel
+              {dl("Cancel", "إلغاء")}
             </Button>
             <Button
               onClick={handleSaveCar}
               disabled={isSavingCar}
               className="bg-gold hover:bg-gold-light text-dark font-bold"
             >
-              {isSavingCar ? "Saving..." : "Save Car"}
+              {isSavingCar ? dl("Saving...", "جاري الحفظ...") : dl("Save Car", "حفظ السيارة")}
             </Button>
           </div>
         </DialogContent>
@@ -2264,13 +2452,13 @@ export default function Dashboard() {
       <Dialog open={dealDialogOpen} onOpenChange={setDealDialogOpen}>
         <DialogContent className="bg-dark-card border-gold/30 max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Create Deal</DialogTitle>
+            <DialogTitle className="text-white text-xl">{dt("createDeal")}</DialogTitle>
           </DialogHeader>
 
           <div className="grid grid-cols-1 gap-4">
             <Select value={dealForm.leadId} onValueChange={handleDealLeadChange}>
               <SelectTrigger className="bg-dark border-gold/20 text-white">
-                <SelectValue placeholder="Select an approved lead" />
+                <SelectValue placeholder={dl("Select an approved lead", "اختر طلباً مقبولاً")} />
               </SelectTrigger>
               <SelectContent className="bg-dark-card border-gold/20">
                 {availableLeadsForDeal.map((lead) => {
@@ -2287,16 +2475,16 @@ export default function Dashboard() {
             <div className="grid grid-cols-2 gap-4">
               <Select value={dealForm.type} onValueChange={(value) => setDealForm({ ...dealForm, type: value })}>
                 <SelectTrigger className="bg-dark border-gold/20 text-white">
-                  <SelectValue placeholder="Deal type" />
+                  <SelectValue placeholder={dl("Deal type", "نوع الصفقة")} />
                 </SelectTrigger>
                 <SelectContent className="bg-dark-card border-gold/20">
-                  <SelectItem value="SALE">SALE</SelectItem>
-                  <SelectItem value="RENT">RENT</SelectItem>
+                  <SelectItem value="SALE">{enumLabel("SALE")}</SelectItem>
+                  <SelectItem value="RENT">{enumLabel("RENT")}</SelectItem>
                 </SelectContent>
               </Select>
               <Input
                 type="number"
-                placeholder="Final price USD"
+                placeholder={dl("Final price USD", "السعر النهائي بالدولار")}
                 value={dealForm.finalPriceAmount}
                 onChange={(event) => setDealForm({ ...dealForm, finalPriceAmount: event.target.value })}
                 className="bg-dark border-gold/20 text-white"
@@ -2304,12 +2492,11 @@ export default function Dashboard() {
             </div>
 
             <div className="rounded-lg border border-gold/20 bg-gold/5 px-4 py-3 text-sm text-white/60">
-              A flat platform commission applies to every deal. Commission is calculated automatically
-              from the final price.
+              {dl("A flat platform commission applies to every deal. Commission is calculated automatically from the final price.", "تُطبّق عمولة منصة ثابتة على كل صفقة، ويتم احتسابها تلقائياً من السعر النهائي.")}
             </div>
 
             <Textarea
-              placeholder="Notes"
+              placeholder={dl("Notes", "ملاحظات")}
               value={dealForm.notes}
               onChange={(event) => setDealForm({ ...dealForm, notes: event.target.value })}
               className="bg-dark border-gold/20 text-white min-h-20"
@@ -2322,14 +2509,14 @@ export default function Dashboard() {
               onClick={() => setDealDialogOpen(false)}
               className="border-gold/30 text-gold hover:bg-gold/10"
             >
-              Cancel
+              {dl("Cancel", "إلغاء")}
             </Button>
             <Button
               onClick={handleSaveDeal}
               disabled={isSavingDeal || !dealForm.leadId}
               className="bg-gold hover:bg-gold-light text-dark font-bold"
             >
-              {isSavingDeal ? "Saving..." : "Save Deal"}
+              {isSavingDeal ? dl("Saving...", "جاري الحفظ...") : dl("Save Deal", "حفظ الصفقة")}
             </Button>
           </div>
         </DialogContent>
@@ -2339,16 +2526,16 @@ export default function Dashboard() {
       <Dialog open={inspectionDialogOpen} onOpenChange={setInspectionDialogOpen}>
         <DialogContent className="bg-dark-card border-gold/30 max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Manage Inspection</DialogTitle>
+            <DialogTitle className="text-white text-xl">{dt("manageInspection")}</DialogTitle>
           </DialogHeader>
 
           {isLoadingInspection ? (
-            <p className="text-white/50 text-sm py-8 text-center">Loading...</p>
+            <p className="text-white/50 text-sm py-8 text-center">{dl("Loading...", "جاري التحميل...")}</p>
           ) : (
             <div className="space-y-6">
               {/* Round history */}
               <div>
-                <h4 className="text-white/70 text-sm font-medium mb-2">History</h4>
+                <h4 className="text-white/70 text-sm font-medium mb-2">{dl("History", "السجل")}</h4>
                 <div className="space-y-2">
                   {(inspectionCase?.rounds ?? []).map((round) => (
                     <div key={round.id} className="bg-dark border border-gold/10 rounded-lg p-3">
@@ -2402,7 +2589,7 @@ export default function Dashboard() {
                     </div>
                   ))}
                   {(!inspectionCase || inspectionCase.rounds.length === 0) && (
-                    <p className="text-white/40 text-sm">No inspection history yet.</p>
+                    <p className="text-white/40 text-sm">{dl("No inspection history yet.", "لا يوجد سجل فحوصات بعد.")}</p>
                   )}
                 </div>
               </div>
@@ -2412,7 +2599,7 @@ export default function Dashboard() {
                 {isPlatformAdmin && latestInspectionRound?.status === "FILE_ACCEPTED" && (
                   <div className="rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 mb-4">
                     <p className="text-red-300 text-sm font-medium mb-2">
-                      Suspected fraudulent maintenance file? Flagging it permanently hides this listing from the marketplace.
+                      {dl("Suspected fraudulent maintenance file? Flagging it permanently hides this listing from the marketplace.", "هل ملف الصيانة مشكوك به؟ وضع علامة احتيال سيخفي هذا العرض من السوق نهائياً.")}
                     </p>
                     <Button
                       variant="outline"
@@ -2422,14 +2609,14 @@ export default function Dashboard() {
                       className="border-red-400/50 text-red-300 hover:bg-red-500/10"
                     >
                       <Flag className="w-4 h-4 mr-2" />
-                      {inspectionActionLoading ? "Flagging..." : "Flag as Fraudulent & Hide"}
+                      {inspectionActionLoading ? dl("Flagging...", "جاري التعليم...") : dl("Flag as Fraudulent & Hide", "تعليم كاحتيال وإخفاء")}
                     </Button>
                   </div>
                 )}
                 {(!latestInspectionRound || ["FILE_ACCEPTED", "CERTIFIED", "CANCELLED"].includes(latestInspectionRound.status)) && (
                   <div className="space-y-4">
                     <h4 className="text-white/70 text-sm font-medium">
-                      {latestInspectionRound ? "Submit a new maintenance file" : "Submit maintenance file (required to publish)"}
+                      {latestInspectionRound ? dl("Submit a new maintenance file", "إرسال ملف صيانة جديد") : dl("Submit maintenance file (required to publish)", "إرسال ملف الصيانة المطلوب للنشر")}
                     </h4>
                     <div className="flex gap-2">
                       <Button
@@ -2438,7 +2625,7 @@ export default function Dashboard() {
                         onClick={() => setInspectionSourceType("TEMPLATE")}
                         className={inspectionSourceType === "TEMPLATE" ? "bg-gold text-dark" : "border-gold/30 text-gold"}
                       >
-                        Fill in details
+                        {dl("Fill in details", "تعبئة التفاصيل")}
                       </Button>
                       <Button
                         variant={inspectionSourceType === "EXTERNAL_FILE" ? "default" : "outline"}
@@ -2446,12 +2633,12 @@ export default function Dashboard() {
                         onClick={() => setInspectionSourceType("EXTERNAL_FILE")}
                         className={inspectionSourceType === "EXTERNAL_FILE" ? "bg-gold text-dark" : "border-gold/30 text-gold"}
                       >
-                        Upload a file
+                        {dl("Upload a file", "رفع ملف")}
                       </Button>
                     </div>
                     {inspectionSourceType === "TEMPLATE" ? (
                       <Textarea
-                        placeholder="Maintenance details (last service date, condition, known issues...)"
+                        placeholder={dl("Maintenance details (last service date, condition, known issues...)", "تفاصيل الصيانة: تاريخ آخر صيانة، الحالة، الأعطال المعروفة...")}
                         value={inspectionTemplateNotes}
                         onChange={(event) => setInspectionTemplateNotes(event.target.value)}
                         className="bg-dark border-gold/20 text-white min-h-24"
@@ -2469,11 +2656,11 @@ export default function Dashboard() {
                       disabled={inspectionActionLoading}
                       className="bg-gold hover:bg-gold-light text-dark font-bold"
                     >
-                      {inspectionActionLoading ? "Submitting..." : "Submit"}
+                      {inspectionActionLoading ? dl("Submitting...", "جاري الإرسال...") : dl("Submit", "إرسال")}
                     </Button>
 
                     <div className="pt-2 border-t border-gold/10">
-                      <p className="text-white/50 text-xs mb-2">Or request a fresh technician inspection on behalf of:</p>
+                      <p className="text-white/50 text-xs mb-2">{dl("Or request a fresh technician inspection on behalf of:", "أو اطلب فحصاً جديداً من فني بالنيابة عن:")}</p>
                       <div className="flex gap-2">
                         {(["SELLER", "BUYER", "RENTER"] as const).map((role) => (
                           <Button
@@ -2484,7 +2671,7 @@ export default function Dashboard() {
                             onClick={() => handleRequestTechnicianVisit(role)}
                             className="border-gold/30 text-gold hover:bg-gold/10"
                           >
-                            {role}
+                            {enumLabel(role)}
                           </Button>
                         ))}
                       </div>
@@ -2494,10 +2681,10 @@ export default function Dashboard() {
 
                 {latestInspectionRound?.status === "ESCALATED_TO_TECHNICIAN" && (
                   <div className="space-y-4">
-                    <h4 className="text-white/70 text-sm font-medium">Schedule technician visit</h4>
+                    <h4 className="text-white/70 text-sm font-medium">{dl("Schedule technician visit", "جدولة زيارة فني")}</h4>
                     <Select value={scheduleTechnicianId} onValueChange={setScheduleTechnicianId}>
                       <SelectTrigger className="bg-dark border-gold/20 text-white">
-                        <SelectValue placeholder="Choose a technician" />
+                        <SelectValue placeholder={dl("Choose a technician", "اختر فني")} />
                       </SelectTrigger>
                       <SelectContent className="bg-dark-card border-gold/20">
                         {technicians.filter((t) => t.isActive).map((technician) => (
@@ -2518,7 +2705,7 @@ export default function Dashboard() {
                       disabled={inspectionActionLoading}
                       className="bg-gold hover:bg-gold-light text-dark font-bold"
                     >
-                      {inspectionActionLoading ? "Scheduling..." : "Schedule"}
+                      {inspectionActionLoading ? dl("Scheduling...", "جاري الجدولة...") : dl("Schedule", "جدولة")}
                     </Button>
                   </div>
                 )}
@@ -2529,15 +2716,15 @@ export default function Dashboard() {
                     disabled={inspectionActionLoading}
                     className="bg-gold hover:bg-gold-light text-dark font-bold"
                   >
-                    {inspectionActionLoading ? "Starting..." : "Start Inspection"}
+                    {inspectionActionLoading ? dl("Starting...", "جاري البدء...") : dl("Start Inspection", "بدء الفحص")}
                   </Button>
                 )}
 
                 {latestInspectionRound?.status === "IN_PROGRESS" && (
                   <div className="space-y-4">
-                    <h4 className="text-white/70 text-sm font-medium">Submit report</h4>
+                    <h4 className="text-white/70 text-sm font-medium">{dl("Submit report", "إرسال التقرير")}</h4>
                     <Input
-                      placeholder="Overall verdict (e.g. Good, Fair, Poor)"
+                      placeholder={dl("Overall verdict (e.g. Good, Fair, Poor)", "التقييم العام: جيد، مقبول، ضعيف...")}
                       value={reportVerdict}
                       onChange={(event) => setReportVerdict(event.target.value)}
                       className="bg-dark border-gold/20 text-white"
@@ -2545,18 +2732,18 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-4">
                       <Input
                         type="number"
-                        placeholder="Price USD"
+                        placeholder={dl("Price USD", "السعر بالدولار")}
                         value={reportPriceAmount}
                         onChange={(event) => setReportPriceAmount(event.target.value)}
                         className="bg-dark border-gold/20 text-white"
                       />
                       <Select value={reportPaidBy} onValueChange={(value) => setReportPaidBy(value as InspectionPaidBy)}>
                         <SelectTrigger className="bg-dark border-gold/20 text-white">
-                          <SelectValue placeholder="Paid by" />
+                          <SelectValue placeholder={dl("Paid by", "الدفع على")} />
                         </SelectTrigger>
                         <SelectContent className="bg-dark-card border-gold/20">
                           {(["SELLER", "BUYER", "RENTER", "DRIVEX"] as const).map((option) => (
-                            <SelectItem key={option} value={option}>{option}</SelectItem>
+                            <SelectItem key={option} value={option}>{enumLabel(option)}</SelectItem>
                           ))}
                         </SelectContent>
                       </Select>
@@ -2564,15 +2751,15 @@ export default function Dashboard() {
 
                     <div className="space-y-3">
                       <div className="flex items-center justify-between">
-                        <p className="text-white/50 text-xs">Findings (optional)</p>
+                        <p className="text-white/50 text-xs">{dl("Findings (optional)", "الملاحظات الفنية (اختياري)")}</p>
                         <Button variant="ghost" size="sm" onClick={addFindingRow} className="text-gold hover:bg-gold/10">
-                          <Plus className="w-3 h-3 mr-1" /> Add finding
+                          <Plus className="w-3 h-3 mr-1" /> {dl("Add finding", "إضافة ملاحظة")}
                         </Button>
                       </div>
                       {reportFindings.map((finding, index) => (
                         <div key={index} className="flex gap-2 items-start bg-dark border border-gold/10 rounded-lg p-2">
                           <Input
-                            placeholder="Description"
+                            placeholder={dl("Description", "الوصف")}
                             value={finding.description}
                             onChange={(event) => updateFindingRow(index, { description: event.target.value })}
                             className="bg-dark border-gold/20 text-white text-sm"
@@ -2586,13 +2773,13 @@ export default function Dashboard() {
                             </SelectTrigger>
                             <SelectContent className="bg-dark-card border-gold/20">
                               {(["MINOR", "MODERATE", "SEVERE", "SAFETY_CRITICAL"] as const).map((option) => (
-                                <SelectItem key={option} value={option}>{option}</SelectItem>
+                                <SelectItem key={option} value={option}>{enumLabel(option)}</SelectItem>
                               ))}
                             </SelectContent>
                           </Select>
                           <Input
                             type="number"
-                            placeholder="Cost USD"
+                            placeholder={dl("Cost USD", "التكلفة بالدولار")}
                             value={finding.costAmount}
                             onChange={(event) => updateFindingRow(index, { costAmount: event.target.value })}
                             className="bg-dark border-gold/20 text-white text-sm w-28"
@@ -2614,7 +2801,7 @@ export default function Dashboard() {
                       disabled={inspectionActionLoading}
                       className="bg-gold hover:bg-gold-light text-dark font-bold"
                     >
-                      {inspectionActionLoading ? "Submitting..." : "Submit Report"}
+                      {inspectionActionLoading ? dl("Submitting...", "جاري الإرسال...") : dl("Submit Report", "إرسال التقرير")}
                     </Button>
                   </div>
                 )}
@@ -2625,7 +2812,7 @@ export default function Dashboard() {
                     disabled={inspectionActionLoading}
                     className="bg-gold hover:bg-gold-light text-dark font-bold"
                   >
-                    {inspectionActionLoading ? "Certifying..." : "Certify Inspection"}
+                    {inspectionActionLoading ? dl("Certifying...", "جاري الاعتماد...") : dl("Certify Inspection", "اعتماد الفحص")}
                   </Button>
                 )}
 
@@ -2636,7 +2823,7 @@ export default function Dashboard() {
                     disabled={inspectionActionLoading}
                     className="text-red-400 hover:bg-red-500/10 mt-3"
                   >
-                    Cancel This Round
+                    {dl("Cancel This Round", "إلغاء هذه الجولة")}
                   </Button>
                 )}
               </div>
@@ -2648,7 +2835,7 @@ export default function Dashboard() {
       <Dialog open={maintenanceDetailOpen} onOpenChange={setMaintenanceDetailOpen}>
         <DialogContent className="bg-dark-card border-gold/30 max-w-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Maintenance Request Details</DialogTitle>
+            <DialogTitle className="text-white text-xl">{dl("Maintenance Request Details", "تفاصيل طلب الصيانة")}</DialogTitle>
           </DialogHeader>
           {selectedMaintenanceRequest && (
             <div className="space-y-5">
@@ -2656,7 +2843,7 @@ export default function Dashboard() {
                 <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
                   <div>
                     <p className="text-white font-semibold">
-                      {selectedMaintenanceRequest.customerName ?? "Customer"}
+                      {selectedMaintenanceRequest.customerName ?? dt("customer")}
                     </p>
                     <p className="text-white/50 text-sm">
                       {selectedMaintenanceRequest.car
@@ -2668,7 +2855,7 @@ export default function Dashboard() {
                     </p>
                   </div>
                   <span className="px-3 py-1 rounded-full bg-gold/10 text-gold text-xs font-medium">
-                    {selectedMaintenanceRequest.status.replaceAll("_", " ")}
+                    {enumLabel(selectedMaintenanceRequest.status)}
                   </span>
                 </div>
                 <p className="text-white/60 text-sm mt-3">{selectedMaintenanceRequest.notes}</p>
@@ -2676,12 +2863,12 @@ export default function Dashboard() {
 
               {isPlatformAdmin && (
                 <div className="rounded-lg border border-gold/10 bg-dark/50 p-4">
-                  <h4 className="text-white font-semibold mb-3">Quote</h4>
+                  <h4 className="text-white font-semibold mb-3">{dl("Quote", "عرض السعر")}</h4>
                   <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
                     <Input
                       type="number"
                       min="0"
-                      placeholder="Amount in USD"
+                      placeholder={dl("Amount in USD", "المبلغ بالدولار")}
                       value={maintenanceQuoteAmount}
                       onChange={(event) => setMaintenanceQuoteAmount(event.target.value)}
                       className="bg-dark border-gold/20 text-white"
@@ -2691,14 +2878,14 @@ export default function Dashboard() {
                       disabled={isSavingMaintenanceAction || !maintenanceQuoteAmount}
                       className="bg-gold hover:bg-gold-light text-dark"
                     >
-                      Send Quote
+                      {dl("Send Quote", "إرسال عرض السعر")}
                     </Button>
                   </div>
                 </div>
               )}
 
               <div className="rounded-lg border border-gold/10 bg-dark/50 p-4">
-                <h4 className="text-white font-semibold mb-3">Updates</h4>
+                <h4 className="text-white font-semibold mb-3">{dl("Updates", "التحديثات")}</h4>
                 {selectedMaintenanceRequest.updates && selectedMaintenanceRequest.updates.length > 0 ? (
                   <div className="space-y-3">
                     {selectedMaintenanceRequest.updates.map((update) => (
@@ -2713,12 +2900,12 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-white/40 text-sm">No updates yet.</p>
+                  <p className="text-white/40 text-sm">{dl("No updates yet.", "لا توجد تحديثات بعد.")}</p>
                 )}
 
                 <div className="mt-4 space-y-3">
                   <Textarea
-                    placeholder="Add an update note"
+                    placeholder={dl("Add an update note", "أضف ملاحظة تحديث")}
                     value={maintenanceNote}
                     onChange={(event) => setMaintenanceNote(event.target.value)}
                     className="bg-dark border-gold/20 text-white min-h-24"
@@ -2729,7 +2916,7 @@ export default function Dashboard() {
                       checked={maintenanceNotePublic}
                       onChange={(event) => setMaintenanceNotePublic(event.target.checked)}
                     />
-                    Visible to customer
+                    {dl("Visible to customer", "ظاهر للعميل")}
                   </label>
                   <Button
                     onClick={addMaintenanceNote}
@@ -2737,13 +2924,13 @@ export default function Dashboard() {
                     variant="outline"
                     className="border-gold/30 text-gold hover:bg-gold/10"
                   >
-                    Add Update
+                    {dl("Add Update", "إضافة تحديث")}
                   </Button>
                 </div>
               </div>
 
               <div className="rounded-lg border border-gold/10 bg-dark/50 p-4">
-                <h4 className="text-white font-semibold mb-3">Attachments</h4>
+                <h4 className="text-white font-semibold mb-3">{dl("Attachments", "المرفقات")}</h4>
                 {selectedMaintenanceRequest.files && selectedMaintenanceRequest.files.length > 0 ? (
                   <div className="space-y-2">
                     {selectedMaintenanceRequest.files.map((file) => (
@@ -2759,15 +2946,15 @@ export default function Dashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-white/40 text-sm">No attachments yet.</p>
+                  <p className="text-white/40 text-sm">{dl("No attachments yet.", "لا توجد مرفقات بعد.")}</p>
                 )}
               </div>
 
               {isPlatformAdmin && selectedMaintenanceRequest.status === "IN_PROGRESS" && (
                 <div className="rounded-lg border border-green-500/20 bg-green-500/10 p-4">
-                  <h4 className="text-white font-semibold mb-3">Public Service Summary</h4>
+                  <h4 className="text-white font-semibold mb-3">{dl("Public Service Summary", "ملخص الصيانة العام")}</h4>
                   <Textarea
-                    placeholder="Sanitized public summary for the car page"
+                    placeholder={dl("Sanitized public summary for the car page", "ملخص مناسب للنشر في صفحة السيارة")}
                     value={maintenancePublicSummary}
                     onChange={(event) => setMaintenancePublicSummary(event.target.value)}
                     className="bg-dark border-green-500/20 text-white min-h-24"
@@ -2777,7 +2964,7 @@ export default function Dashboard() {
                     disabled={isSavingMaintenanceAction}
                     className="mt-3 bg-green-500 hover:bg-green-600 text-white"
                   >
-                    Complete Maintenance
+                    {dl("Complete Maintenance", "إنهاء الصيانة")}
                   </Button>
                 </div>
               )}
@@ -2791,38 +2978,38 @@ export default function Dashboard() {
         <DialogContent className="bg-dark-card border-gold/30 max-w-lg">
           <DialogHeader>
             <DialogTitle className="text-white text-xl">
-              {editingTechnicianId ? "Edit Technician" : "Add Technician"}
+              {editingTechnicianId ? dl("Edit Technician", "تعديل الفني") : dt("addTechnician")}
             </DialogTitle>
           </DialogHeader>
           <div className="grid grid-cols-1 gap-4">
             <Input
-              placeholder="Name"
+              placeholder={dt("name")}
               value={technicianForm.name}
               onChange={(event) => setTechnicianForm({ ...technicianForm, name: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <div className="grid grid-cols-2 gap-4">
               <Input
-                placeholder="City"
+                placeholder={dt("city")}
                 value={technicianForm.city}
                 onChange={(event) => setTechnicianForm({ ...technicianForm, city: event.target.value })}
                 className="bg-dark border-gold/20 text-white"
               />
               <Input
-                placeholder="Phone (optional)"
+                placeholder={dl("Phone (optional)", "الهاتف (اختياري)")}
                 value={technicianForm.phone}
                 onChange={(event) => setTechnicianForm({ ...technicianForm, phone: event.target.value })}
                 className="bg-dark border-gold/20 text-white"
               />
             </div>
             <Input
-              placeholder="Specialty (e.g. mechanical, electrical, body)"
+              placeholder={dl("Specialty (e.g. mechanical, electrical, body)", "الاختصاص: ميكانيك، كهرباء، هيكل...")}
               value={technicianForm.specialty}
               onChange={(event) => setTechnicianForm({ ...technicianForm, specialty: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
             <div>
-              <p className="text-white/50 text-xs mb-2">Service tiers</p>
+              <p className="text-white/50 text-xs mb-2">{dl("Service tiers", "باقات الخدمة")}</p>
               <div className="flex gap-2">
                 {(["QUICK", "COMPREHENSIVE"] as const).map((tier) => (
                   <Button
@@ -2833,7 +3020,7 @@ export default function Dashboard() {
                     onClick={() => toggleTechnicianTier(tier)}
                     className={technicianForm.serviceTiers.includes(tier) ? "bg-gold text-dark" : "border-gold/30 text-gold"}
                   >
-                    {tier}
+                    {enumLabel(tier)}
                   </Button>
                 ))}
               </div>
@@ -2845,14 +3032,14 @@ export default function Dashboard() {
               onClick={() => setTechnicianDialogOpen(false)}
               className="border-gold/30 text-gold hover:bg-gold/10"
             >
-              Cancel
+              {dl("Cancel", "إلغاء")}
             </Button>
             <Button
               onClick={handleSaveTechnician}
               disabled={isSavingTechnician}
               className="bg-gold hover:bg-gold-light text-dark font-bold"
             >
-              {isSavingTechnician ? "Saving..." : "Save Technician"}
+              {isSavingTechnician ? dl("Saving...", "جاري الحفظ...") : dl("Save Technician", "حفظ الفني")}
             </Button>
           </div>
         </DialogContent>
@@ -2861,7 +3048,7 @@ export default function Dashboard() {
       <Dialog open={complaintDialogOpen} onOpenChange={setComplaintDialogOpen}>
         <DialogContent className="bg-dark-card border-gold/30 max-w-lg">
           <DialogHeader>
-            <DialogTitle className="text-white text-xl">Review Complaint</DialogTitle>
+            <DialogTitle className="text-white text-xl">{dl("Review Complaint", "مراجعة الشكوى")}</DialogTitle>
           </DialogHeader>
           {reviewingComplaint && (
             <div className="space-y-4">
@@ -2877,7 +3064,7 @@ export default function Dashboard() {
                 <p className="text-white/70 text-sm">{reviewingComplaint.description}</p>
               </div>
               <Textarea
-                placeholder="Review note (required when substantiating)"
+                placeholder={dl("Review note (required when substantiating)", "ملاحظة المراجعة (مطلوبة عند إثبات الشكوى)")}
                 value={reviewNote}
                 onChange={(event) => setReviewNote(event.target.value)}
                 className="bg-dark border-gold/20 text-white min-h-20"
@@ -2889,7 +3076,7 @@ export default function Dashboard() {
                   disabled={isReviewing}
                   className="border-white/20 text-white/70 hover:bg-white/10"
                 >
-                  Dismiss
+                  {dl("Dismiss", "رفض")}
                 </Button>
                 <Button
                   variant="outline"
@@ -2897,14 +3084,14 @@ export default function Dashboard() {
                   disabled={isReviewing}
                   className="border-orange-400/50 text-orange-300 hover:bg-orange-500/10"
                 >
-                  Substantiate
+                  {dl("Substantiate", "إثبات")}
                 </Button>
                 <Button
                   onClick={() => handleReviewComplaint("RESOLVED")}
                   disabled={isReviewing}
                   className="bg-gold hover:bg-gold-light text-dark font-bold"
                 >
-                  {isReviewing ? "Saving..." : "Mark Resolved"}
+                  {isReviewing ? dl("Saving...", "جاري الحفظ...") : dl("Mark Resolved", "تعليم كمحلولة")}
                 </Button>
               </div>
             </div>
