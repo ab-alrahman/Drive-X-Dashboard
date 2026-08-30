@@ -426,7 +426,7 @@ export default function Dashboard() {
     try {
       const admin = await updateAdminProfile(profileNameInput.trim());
       setUser({ name: admin.fullName ?? dt("adminUser"), email: admin.email });
-      setActionMessage("Profile updated successfully.");
+      setActionMessage(t("successProfileUpdated"));
     } catch (error) {
       setActionMessage(localizeError(error, t, "errUpdateProfile"));
     } finally {
@@ -486,7 +486,7 @@ export default function Dashboard() {
         note: `Quote set at ${quote} USD.`
       });
       await refreshSelectedMaintenanceRequest();
-      setActionMessage("Maintenance quote sent to customer.");
+      setActionMessage(t("successQuoteSent"));
     } catch (error) {
       setDashboardError(localizeError(error, t, "errSetQuote"));
     } finally {
@@ -522,7 +522,7 @@ export default function Dashboard() {
         publicSummary: maintenancePublicSummary || "Drive X verified maintenance completed."
       });
       await refreshSelectedMaintenanceRequest();
-      setActionMessage("Maintenance request completed.");
+      setActionMessage(t("successMaintenanceCompleted"));
     } catch (error) {
       setDashboardError(localizeError(error, t, "errCompleteMaintenance"));
     } finally {
@@ -641,7 +641,7 @@ export default function Dashboard() {
       }
       if (editingCarId) {
         await updateAdminCar(editingCarId, carPayloadFromForm());
-        setActionMessage("Car updated successfully.");
+        setActionMessage(t("successCarUpdated"));
         setCarDialogOpen(false);
       } else {
         // New cars can't be published (AVAILABLE/RESERVED) until they have an accepted
@@ -649,7 +649,7 @@ export default function Dashboard() {
         // on create regardless of what the form's Status field says, then guide the admin
         // straight into submitting that inspection for the car they just made.
         const created = await createAdminCar({ ...carPayloadFromForm(), status: "INACTIVE" });
-        setActionMessage("Car created as Inactive. Add a maintenance file/inspection below to publish it.");
+        setActionMessage(t("successCarCreatedInactive"));
         setCarDialogOpen(false);
         openInspectionDialog(created.id);
       }
@@ -666,7 +666,7 @@ export default function Dashboard() {
     if (!confirmed) return;
     try {
       await deleteAdminCar(carId);
-      setActionMessage("Car deleted successfully.");
+      setActionMessage(t("successCarDeleted"));
       await refreshDashboardData();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errDeleteCar"));
@@ -721,7 +721,7 @@ export default function Dashboard() {
         finalPrice: { amount: Number(dealForm.finalPriceAmount), currency: "USD" },
         notes: dealForm.notes || undefined,
       });
-      setActionMessage("Deal created successfully.");
+      setActionMessage(t("successDealCreated"));
       setDealDialogOpen(false);
       await refreshDashboardData();
     } catch (error) {
@@ -738,7 +738,7 @@ export default function Dashboard() {
     if (!confirmed) return;
     try {
       await deleteAdminDeal(dealId);
-      setActionMessage("Deal deleted successfully.");
+      setActionMessage(t("successDealDeleted"));
       await refreshDashboardData();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errDeleteDeal"));
@@ -795,7 +795,7 @@ export default function Dashboard() {
           templateData: { notes: inspectionTemplateNotes.trim() },
         });
       }
-      setActionMessage("Maintenance file accepted. The car can now be published.");
+      setActionMessage(t("successMaintenanceFileAccepted"));
       resetInspectionForms();
       await refreshInspectionCase();
     } catch (error) {
@@ -811,7 +811,7 @@ export default function Dashboard() {
     setDashboardError("");
     try {
       await requestTechnicianVisit(inspectionCarId, { requestedByRole: role });
-      setActionMessage("Technician visit requested - schedule it below.");
+      setActionMessage(t("successTechnicianVisitRequested"));
       await refreshInspectionCase();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errRequestTechnician"));
@@ -823,7 +823,7 @@ export default function Dashboard() {
   const handleScheduleRound = async () => {
     if (!latestInspectionRound) return;
     if (!scheduleTechnicianId || !scheduleDateTime) {
-      setDashboardError("Pick a technician and a date/time.");
+      setDashboardError(t("errPickTechnicianSchedule"));
       return;
     }
     setInspectionActionLoading(true);
@@ -833,7 +833,7 @@ export default function Dashboard() {
         technicianId: scheduleTechnicianId,
         scheduledAt: new Date(scheduleDateTime).toISOString(),
       });
-      setActionMessage("Inspection scheduled.");
+      setActionMessage(t("successInspectionScheduled"));
       await refreshInspectionCase();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errScheduleInspection"));
@@ -848,7 +848,7 @@ export default function Dashboard() {
     setDashboardError("");
     try {
       await startInspectionRound(latestInspectionRound.id);
-      setActionMessage("Inspection marked in progress.");
+      setActionMessage(t("successInspectionInProgress"));
       await refreshInspectionCase();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errStartInspection"));
@@ -882,7 +882,7 @@ export default function Dashboard() {
         paidBy: reportPaidBy,
         findings,
       });
-      setActionMessage("Inspection report submitted - certify it to finalize.");
+      setActionMessage(t("successReportSubmitted"));
       await refreshInspectionCase();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errSubmitReport"));
@@ -897,7 +897,7 @@ export default function Dashboard() {
     setDashboardError("");
     try {
       await certifyInspectionRound(latestInspectionRound.id);
-      setActionMessage("Inspection certified - Drive X Certified badge is now live on this car.");
+      setActionMessage(t("successInspectionCertified"));
       await refreshInspectionCase();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errCertifyInspection"));
@@ -914,7 +914,7 @@ export default function Dashboard() {
     setDashboardError("");
     try {
       await cancelInspectionRound(latestInspectionRound.id);
-      setActionMessage("Inspection round cancelled.");
+      setActionMessage(t("successInspectionCancelled"));
       await refreshInspectionCase();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errCancelRound"));
@@ -952,7 +952,7 @@ export default function Dashboard() {
 
   const handleSaveTechnician = async () => {
     if (!technicianForm.name.trim() || !technicianForm.city.trim()) {
-      setDashboardError("Technician name and city are required.");
+      setDashboardError(t("errTechnicianNameCityRequired"));
       return;
     }
     setIsSavingTechnician(true);
@@ -967,10 +967,10 @@ export default function Dashboard() {
       };
       if (editingTechnicianId) {
         await updateTechnician(editingTechnicianId, payload);
-        setActionMessage("Technician updated.");
+        setActionMessage(t("successTechnicianUpdated"));
       } else {
         await createTechnician(payload);
-        setActionMessage("Technician added.");
+        setActionMessage(t("successTechnicianAdded"));
       }
       setTechnicianDialogOpen(false);
       await refreshDashboardData();
@@ -1001,10 +1001,10 @@ export default function Dashboard() {
     try {
       if (vendor.status === "SUSPENDED") {
         await unsuspendVendor(vendor.id);
-        setActionMessage("Vendor re-activated.");
+        setActionMessage(t("successVendorReactivated"));
       } else {
         await suspendVendor(vendor.id, reason);
-        setActionMessage("Vendor suspended - their listings are hidden from the public marketplace.");
+        setActionMessage(t("successVendorSuspended"));
       }
       await refreshPlatformData();
     } catch (error) {
@@ -1023,10 +1023,10 @@ export default function Dashboard() {
     try {
       if (car.hiddenByPlatform) {
         await unhidePlatformCar(car.id);
-        setActionMessage("Listing restored to the marketplace.");
+        setActionMessage(t("successListingRestored"));
       } else {
         await hidePlatformCar(car.id, reason);
-        setActionMessage("Listing hidden from the public marketplace.");
+        setActionMessage(t("successListingHidden"));
       }
       await refreshDashboardData();
       await refreshPlatformData();
@@ -1044,7 +1044,7 @@ export default function Dashboard() {
   const handleReviewComplaint = async (decision: "SUBSTANTIATED" | "DISMISSED" | "RESOLVED") => {
     if (!reviewingComplaint) return;
     if (decision === "SUBSTANTIATED" && !reviewNote.trim()) {
-      setDashboardError("Add a review note explaining the decision.");
+      setDashboardError(t("errAddReviewNote"));
       return;
     }
     setIsReviewing(true);
@@ -1079,7 +1079,7 @@ export default function Dashboard() {
     setDashboardError("");
     try {
       await flagRoundFraudulent(roundId, reason);
-      setActionMessage("Round flagged as fraudulent - the car listing has been hidden from the marketplace.");
+      setActionMessage(t("successRoundFlagged"));
       await refreshInspectionCase();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errFlagRound"));

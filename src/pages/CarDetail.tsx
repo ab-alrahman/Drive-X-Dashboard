@@ -222,7 +222,7 @@ export default function CarDetail() {
   const handleSubmitComplaint = async () => {
     if (!car) return;
     if (complaintText.trim().length < 10) {
-      setComplaintError("Please describe the issue in at least 10 characters.");
+      setComplaintError(t("errDescribeIssueLength"));
       return;
     }
     setIsSubmittingComplaint(true);
