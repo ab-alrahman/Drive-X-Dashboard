@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { clearAuthTokens, setAdminSessionProfile } from "@/lib/api";
 import { getCurrentAdmin, loginAdmin } from "@/lib/auth-api";
 import { useI18n } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 
 export default function AdminLogin() {
   const navigate = useNavigate();
@@ -44,7 +45,7 @@ export default function AdminLogin() {
       navigate("/dashboard");
     } catch (error) {
       clearAuthTokens();
-      setError(error instanceof Error ? error.message : t("adminLoginFailed"));
+      setError(localizeError(error, t, "adminLoginFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -133,6 +134,12 @@ export default function AdminLogin() {
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
+            </div>
+
+            <div className="flex items-center justify-end">
+              <Link to="/forgot-password" className="text-gold hover:text-gold-light text-sm font-medium">
+                {t("forgotPassword")}
+              </Link>
             </div>
 
             <Button

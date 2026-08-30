@@ -1,5 +1,10 @@
 import { apiFetch, clearAuthTokens, getRefreshToken, setAuthTokens } from "./api";
-import type { AdminProfile, AuthTokenResponse } from "./api-types";
+import type {
+  AdminProfile,
+  AuthTokenResponse,
+  PasswordResetRequestResponse,
+  PasswordResetResponse,
+} from "./api-types";
 
 export async function loginAdmin(email: string, password: string) {
   const tokens = await apiFetch<AuthTokenResponse>("/v1/admin/auth/login", {
@@ -42,5 +47,19 @@ export async function logoutAdmin() {
     }).catch(() => undefined);
   }
   clearAuthTokens();
+}
+
+export function forgotAdminPassword(email: string) {
+  return apiFetch<PasswordResetRequestResponse>("/v1/admin/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetAdminPassword(token: string, newPassword: string) {
+  return apiFetch<PasswordResetResponse>("/v1/admin/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
+  });
 }
 

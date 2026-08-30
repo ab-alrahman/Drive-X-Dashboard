@@ -148,6 +148,16 @@ export interface CustomerAuthResponse extends AuthTokenResponse {
   customer: CustomerProfile;
 }
 
+export interface PasswordResetRequestResponse {
+  message: string;
+  resetToken?: string;
+  email?: string;
+}
+
+export interface PasswordResetResponse {
+  message: string;
+}
+
 export interface DashboardSummaryResponse {
   totalCars: number;
   availableCars: number;

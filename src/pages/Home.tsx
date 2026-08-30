@@ -15,9 +15,10 @@ import {
   Users,
   Award,
   Search,
+  ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { testimonials, stats } from "@/data/cars";
+import { stats } from "@/data/cars";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
 import { getFiltersMeta, getPublicCars } from "@/lib/public-api";
 import { useI18n } from "@/lib/i18n";
@@ -31,7 +32,7 @@ const listingTypeOptions = [
 
 export default function Home() {
   const navigate = useNavigate();
-  const { t } = useI18n();
+  const { language, t } = useI18n();
   const [heroLoaded] = useState(true);
   const [activeTestimonial, setActiveTestimonial] = useState(0);
   const [quickSearch, setQuickSearch] = useState({ category: "All", brand: "All", priceRange: "All" });
@@ -79,6 +80,57 @@ export default function Home() {
     { icon: Wrench, titleKey: "premiumWarranty" as const, descKey: "premiumWarrantyDesc" as const },
     { icon: Zap, titleKey: "bestPrices" as const, descKey: "bestPricesDesc" as const },
   ];
+
+  const localizedTestimonials = [
+    {
+      id: 1,
+      name: language === "ar" ? "أحمد الراشد" : "Ahmed Al-Rashid",
+      role: language === "ar" ? "صاحب شركة" : "Business Owner",
+      avatar: language === "ar" ? "أ" : "A",
+      text:
+        language === "ar"
+          ? "كانت تجربة شراء السيارة واضحة وسلسة من أول زيارة حتى الاستلام. ساعدني فريق Drive X في مقارنة الخيارات واختيار BMW M8 بمواصفات ممتازة، وكل خطوة كانت منظمة ومحترفة."
+          : "The most seamless car buying experience I've ever had. The showroom is incredible, and the team went above and beyond to find my dream car. The BMW M8 I purchased exceeded all expectations.",
+      car: "BMW M8 Competition",
+    },
+    {
+      id: 2,
+      name: language === "ar" ? "خالد بن سعد" : "Khalid Bin Saad",
+      role: language === "ar" ? "رئيس تنفيذي، Tech Ventures" : "CEO, Tech Ventures",
+      avatar: language === "ar" ? "خ" : "K",
+      text:
+        language === "ar"
+          ? "تعاملت مع معارض كثيرة، لكن Drive X مختلف في الوضوح والاهتمام بالتفاصيل. السعر كان شفافاً، والمتابعة بعد الشراء ممتازة، ووصلت Porsche Taycan بحالة مثالية."
+          : "I've bought cars from dealerships worldwide, but Drive X stands apart. Their attention to detail, transparent pricing, and after-sales service are world-class. My Porsche Taycan was delivered in perfect condition.",
+      car: "Porsche Taycan Turbo S",
+    },
+    {
+      id: 3,
+      name: language === "ar" ? "محمد الفارسي" : "Mohammed Al-Farsi",
+      role: language === "ar" ? "مصرفي استثماري" : "Investment Banker",
+      avatar: language === "ar" ? "م" : "M",
+      text:
+        language === "ar"
+          ? "عندما تختار سيارة بهذا المستوى، تتوقع دقة في كل تفصيلة. Drive X قدمت تجربة تليق بالسيارة؛ Ferrari SF90 كانت نظيفة بالكامل، والإجراءات تمت باحترافية عالية."
+          : "When you're spending half a million on a car, you expect perfection. Drive X delivered exactly that. The Ferrari SF90 was immaculate, and the entire process was handled with utmost professionalism.",
+      car: "Ferrari SF90 Stradale",
+    },
+  ];
+
+  const isRtl = language === "ar";
+
+  const nextTestimonial = () => {
+    setActiveTestimonial((current) => (current + 1) % localizedTestimonials.length);
+  };
+
+  const previousTestimonial = () => {
+    setActiveTestimonial((current) => (current - 1 + localizedTestimonials.length) % localizedTestimonials.length);
+  };
+
+  useEffect(() => {
+    const timer = window.setInterval(nextTestimonial, 5000);
+    return () => window.clearInterval(timer);
+  }, [language]);
 
   return (
     <div className="min-h-screen bg-dark">
@@ -482,48 +534,74 @@ export default function Home() {
             </h2>
           </div>
 
-          <div className="relative max-w-4xl mx-auto">
-            <div className="bg-dark-card border border-gold/20 rounded-2xl p-8 md:p-12">
-              <Quote className="w-12 h-12 text-gold/30 mb-6" />
+          <div className="relative max-w-5xl mx-auto">
+            <div className="absolute inset-y-0 -left-4 -right-4 hidden md:flex items-center justify-between pointer-events-none z-10">
+              <button
+                type="button"
+                onClick={previousTestimonial}
+                className="pointer-events-auto w-11 h-11 rounded-full border border-gold/30 bg-dark-card/90 text-gold hover:bg-gold hover:text-dark transition-colors flex items-center justify-center"
+                aria-label={language === "ar" ? "التعليق السابق" : "Previous testimonial"}
+              >
+                <ChevronLeft className="w-5 h-5" />
+              </button>
+              <button
+                type="button"
+                onClick={nextTestimonial}
+                className="pointer-events-auto w-11 h-11 rounded-full border border-gold/30 bg-dark-card/90 text-gold hover:bg-gold hover:text-dark transition-colors flex items-center justify-center"
+                aria-label={language === "ar" ? "التعليق التالي" : "Next testimonial"}
+              >
+                <ChevronRight className="w-5 h-5" />
+              </button>
+            </div>
 
-              <div className="min-h-[200px]">
-                <p className="text-white/80 text-lg md:text-xl leading-relaxed mb-8">
-                  "{testimonials[activeTestimonial].text}"
-                </p>
+            <div className="bg-dark-card border border-gold/20 rounded-2xl overflow-hidden">
+              <div
+                className="flex transition-transform duration-700 ease-out"
+                style={{ transform: `translateX(${isRtl ? activeTestimonial * 100 : -activeTestimonial * 100}%)` }}
+              >
+                {localizedTestimonials.map((testimonial) => (
+                  <article key={testimonial.id} className="min-w-full p-8 md:p-12">
+                    <Quote className="w-12 h-12 text-gold/30 mb-6" />
 
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-4">
-                    <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center text-dark font-bold text-lg">
-                      {testimonials[activeTestimonial].avatar}
-                    </div>
-                    <div>
-                      <p className="text-white font-bold">
-                        {testimonials[activeTestimonial].name}
+                    <div className="min-h-[230px] flex flex-col justify-between">
+                      <p className="text-white/80 text-lg md:text-xl leading-relaxed mb-8">
+                        "{testimonial.text}"
                       </p>
-                      <p className="text-gold text-sm">
-                        {testimonials[activeTestimonial].role}
-                      </p>
+
+                      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-5">
+                        <div className="flex items-center gap-4">
+                          <div className="w-12 h-12 rounded-full bg-gradient-to-br from-gold to-gold-dark flex items-center justify-center text-dark font-bold text-lg shrink-0">
+                            {testimonial.avatar}
+                          </div>
+                          <div>
+                            <p className="text-white font-bold">{testimonial.name}</p>
+                            <p className="text-gold text-sm">{testimonial.role}</p>
+                          </div>
+                        </div>
+                        <div className="sm:text-end">
+                          <p className="text-white/40 text-sm">{t("purchased")}</p>
+                          <p className="text-gold text-sm font-medium">{testimonial.car}</p>
+                        </div>
+                      </div>
                     </div>
-                  </div>
-                  <div className="hidden md:block">
-                    <p className="text-white/40 text-sm">{t("purchased")}</p>
-                    <p className="text-gold text-sm font-medium">
-                      {testimonials[activeTestimonial].car}
-                    </p>
-                  </div>
-                </div>
+                  </article>
+                ))}
               </div>
 
-              <div className="flex items-center justify-center gap-2 mt-8">
-                {testimonials.map((_, i) => (
+              <div className="flex items-center justify-center gap-2 pb-8">
+                {localizedTestimonials.map((testimonial, i) => (
                   <button
-                    key={i}
+                    key={testimonial.id}
+                    type="button"
                     onClick={() => setActiveTestimonial(i)}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
-                      i === activeTestimonial
-                        ? "bg-gold w-8"
-                        : "bg-gold/30 hover:bg-gold/50"
+                    className={`h-2 rounded-full transition-all duration-300 ${
+                      i === activeTestimonial ? "bg-gold w-10" : "bg-gold/30 hover:bg-gold/50 w-2"
                     }`}
+                    aria-label={
+                      language === "ar"
+                        ? `عرض تعليق ${testimonial.name}`
+                        : `Show testimonial from ${testimonial.name}`
+                    }
                   />
                 ))}
               </div>

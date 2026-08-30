@@ -7,6 +7,7 @@ import { setAdminSessionProfile } from "@/lib/api";
 import { registerVendor } from "@/lib/vendors-api";
 import { getCurrentAdmin } from "@/lib/auth-api";
 import { useI18n } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 
 export default function VendorRegister() {
   const navigate = useNavigate();
@@ -54,7 +55,7 @@ export default function VendorRegister() {
       });
       navigate("/dashboard");
     } catch (error) {
-      setError(error instanceof Error ? error.message : t("couldNotRegisterDealership"));
+      setError(localizeError(error, t, "couldNotRegisterDealership"));
     } finally {
       setIsLoading(false);
     }

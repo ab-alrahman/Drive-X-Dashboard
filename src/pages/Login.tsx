@@ -7,6 +7,7 @@ import { setAdminSessionProfile } from "@/lib/api";
 import { getCurrentAdmin, loginAdmin } from "@/lib/auth-api";
 import { loginCustomer } from "@/lib/public-api";
 import { useI18n } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 
 type LoginMode = "customer" | "admin";
 
@@ -45,7 +46,7 @@ export default function Login() {
         navigate("/inventory");
       }
     } catch (error) {
-      setError(error instanceof Error ? error.message : t("loginFailed"));
+      setError(localizeError(error, t, "loginFailed"));
     } finally {
       setIsLoading(false);
     }
@@ -203,11 +204,9 @@ export default function Login() {
             </div>
 
             <div className="flex items-center justify-end">
-              {mode === "admin" && (
-                <Link to="/forgot-password" className="text-gold hover:text-gold-light text-sm font-medium">
-                  {t("forgotPassword")}
-                </Link>
-              )}
+              <Link to="/forgot-password" className="text-gold hover:text-gold-light text-sm font-medium">
+                {t("forgotPassword")}
+              </Link>
             </div>
 
             <Button

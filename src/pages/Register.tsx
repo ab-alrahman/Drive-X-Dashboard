@@ -6,6 +6,7 @@ import { Input } from "@/components/ui/input";
 import { Checkbox } from "@/components/ui/checkbox";
 import { registerCustomer } from "@/lib/public-api";
 import { useI18n } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -50,7 +51,7 @@ export default function Register() {
       });
       navigate("/inventory");
     } catch (error) {
-      setError(error instanceof Error ? error.message : t("couldNotCreateAccount"));
+      setError(localizeError(error, t, "couldNotCreateAccount"));
     } finally {
       setIsLoading(false);
     }

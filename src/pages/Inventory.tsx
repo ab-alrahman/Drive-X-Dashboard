@@ -38,6 +38,7 @@ import {
   removeFavoriteCar,
 } from "@/lib/public-api";
 import { useI18n } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 
 const listingTypes = [
   { labelKey: "all" as const, value: "All" },
@@ -125,7 +126,7 @@ export default function Inventory() {
         })
         .catch((error: Error) => {
           setInventoryCars([]);
-          setCarsError(error.message || "Could not load inventory right now.");
+          setCarsError(localizeError(error, t, "errLoadInventory"));
         })
         .finally(() => setIsLoadingCars(false));
     }, 250);
@@ -152,7 +153,7 @@ export default function Inventory() {
       }
     } catch (error) {
       setFavorites((prev) => (wasFavorite ? [...prev, id] : prev.filter((favoriteId) => favoriteId !== id)));
-      setFavoriteMessage(error instanceof Error ? error.message : t("couldNotUpdateFavorites"));
+      setFavoriteMessage(localizeError(error, t, "couldNotUpdateFavorites"));
     }
   };
 

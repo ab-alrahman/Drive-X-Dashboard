@@ -40,6 +40,7 @@ import {
 import type { ApiCar, LeadResponse, CustomerProfile, CustomerCarAsset, MaintenanceRequest, MaintenanceRequestType } from "@/lib/api-types";
 import { resolveAssetUrl } from "@/lib/api";
 import { useI18n, type MessageKey } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -116,7 +117,7 @@ export default function CustomerDashboard() {
       setMaintenanceRequests(maintenanceData.items);
       setMaintenanceForm((current) => ({ ...current, contactPhone: profileData.phone ?? "" }));
     } catch (err) {
-      setError(err instanceof Error ? err.message : t("failedToLoadDashboard"));
+      setError(localizeError(err, t, "failedToLoadDashboard"));
     } finally {
       setLoading(false);
     }
@@ -155,7 +156,7 @@ export default function CustomerDashboard() {
       setCustomerSessionProfile(updated);
       setProfileMessage(t("profileUpdatedSuccess"));
     } catch (err) {
-      setProfileMessage(err instanceof Error ? err.message : t("failedToUpdateProfile"));
+      setProfileMessage(localizeError(err, t, "failedToUpdateProfile"));
     } finally {
       setSavingProfile(false);
     }
@@ -197,7 +198,7 @@ export default function CustomerDashboard() {
       setMaintenanceDialogOpen(false);
       setActiveTab("maintenance");
     } catch (err) {
-      setMaintenanceMessage(err instanceof Error ? err.message : "Could not create maintenance request.");
+      setMaintenanceMessage(localizeError(err, t, "errCreateMaintenance"));
     } finally {
       setSavingMaintenance(false);
     }
@@ -232,7 +233,7 @@ export default function CustomerDashboard() {
       await refreshSelectedMaintenanceRequest();
       setMaintenanceDetailMessage("File uploaded.");
     } catch (err) {
-      setMaintenanceDetailMessage(err instanceof Error ? err.message : "Could not upload file.");
+      setMaintenanceDetailMessage(localizeError(err, t, "errUploadFile"));
     }
   };
 

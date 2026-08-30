@@ -18,13 +18,13 @@ export default function Footer() {
     { labelKey: "dashboard", path: "/dashboard" },
   ];
 
-  const services: MessageKey[] = [
-    "buyACar",
-    "sellYourCar",
-    "carFinancing",
-    "tradeIn",
-    "vehicleInspection",
-    "premiumWarranty",
+  const services: Array<{ labelKey: MessageKey; path?: string }> = [
+    { labelKey: "buyACar", path: "/inventory" },
+    { labelKey: "sellYourCar", path: "/vendor-register" },
+    { labelKey: "carFinancing" },
+    { labelKey: "tradeIn" },
+    { labelKey: "vehicleInspection" },
+    { labelKey: "premiumWarranty" },
   ];
 
   return (
@@ -71,9 +71,15 @@ export default function Footer() {
           <div>
             <h4 className="text-gold font-semibold mb-6 uppercase tracking-wider text-sm">{t("services")}</h4>
             <ul className="space-y-3">
-              {services.map((key) => (
-                <li key={key}>
-                  <span className="text-white/60 text-sm">{t(key)}</span>
+              {services.map((service) => (
+                <li key={service.labelKey}>
+                  {service.path ? (
+                    <Link to={service.path} className="text-white/60 hover:text-gold transition-colors duration-300 text-sm">
+                      {t(service.labelKey)}
+                    </Link>
+                  ) : (
+                    <span className="text-white/60 text-sm">{t(service.labelKey)}</span>
+                  )}
                 </li>
               ))}
             </ul>

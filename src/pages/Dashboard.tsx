@@ -104,6 +104,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 
 const emptyReportFinding = { description: "", severity: "MINOR" as InspectionFindingSeverity, costAmount: "" };
 
@@ -296,7 +297,7 @@ type DashboardTextKey = keyof typeof dashboardText.en;
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  const { language } = useI18n();
+  const { language, t } = useI18n();
   const dt = (key: DashboardTextKey) => dashboardText[language][key];
   const dl = (en: string, ar: string) => (language === "ar" ? ar : en);
   const enumLabel = (value: string) => {
@@ -427,7 +428,7 @@ export default function Dashboard() {
       setUser({ name: admin.fullName ?? dt("adminUser"), email: admin.email });
       setActionMessage("Profile updated successfully.");
     } catch (error) {
-      setActionMessage(error instanceof Error ? error.message : "Could not update profile.");
+      setActionMessage(localizeError(error, t, "errUpdateProfile"));
     } finally {
       setIsSavingProfile(false);
     }
@@ -487,7 +488,7 @@ export default function Dashboard() {
       await refreshSelectedMaintenanceRequest();
       setActionMessage("Maintenance quote sent to customer.");
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not set maintenance quote.");
+      setDashboardError(localizeError(error, t, "errSetQuote"));
     } finally {
       setIsSavingMaintenanceAction(false);
     }
@@ -505,7 +506,7 @@ export default function Dashboard() {
       setMaintenanceNotePublic(false);
       await refreshSelectedMaintenanceRequest();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not add maintenance update.");
+      setDashboardError(localizeError(error, t, "errAddUpdate"));
     } finally {
       setIsSavingMaintenanceAction(false);
     }
@@ -523,7 +524,7 @@ export default function Dashboard() {
       await refreshSelectedMaintenanceRequest();
       setActionMessage("Maintenance request completed.");
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not complete maintenance request.");
+      setDashboardError(localizeError(error, t, "errCompleteMaintenance"));
     } finally {
       setIsSavingMaintenanceAction(false);
     }
@@ -531,7 +532,7 @@ export default function Dashboard() {
 
   useEffect(() => {
     refreshDashboardData().catch((error: Error) => {
-      setDashboardError(error.message || "Could not load dashboard data.");
+      setDashboardError(localizeError(error, t, "errLoadDashboard"));
     });
   }, []);
 
@@ -548,7 +549,7 @@ export default function Dashboard() {
   useEffect(() => {
     if (isPlatformAdmin) {
       refreshPlatformData().catch((error: Error) => {
-        setDashboardError(error.message || "Could not load platform data.");
+        setDashboardError(localizeError(error, t, "errLoadPlatform"));
       });
     }
   }, [isPlatformAdmin, refreshPlatformData]);
@@ -654,7 +655,7 @@ export default function Dashboard() {
       }
       await refreshDashboardData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not save car.");
+      setDashboardError(localizeError(error, t, "errSaveCar"));
     } finally {
       setIsSavingCar(false);
     }
@@ -668,7 +669,7 @@ export default function Dashboard() {
       setActionMessage("Car deleted successfully.");
       await refreshDashboardData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not delete car.");
+      setDashboardError(localizeError(error, t, "errDeleteCar"));
     }
   };
 
@@ -677,7 +678,7 @@ export default function Dashboard() {
       await updateAdminLead(leadId, { status });
       await refreshDashboardData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not update lead.");
+      setDashboardError(localizeError(error, t, "errUpdateLead"));
     }
   };
 
@@ -724,7 +725,7 @@ export default function Dashboard() {
       setDealDialogOpen(false);
       await refreshDashboardData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not create deal.");
+      setDashboardError(localizeError(error, t, "errCreateDeal"));
     } finally {
       setIsSavingDeal(false);
     }
@@ -740,7 +741,7 @@ export default function Dashboard() {
       setActionMessage("Deal deleted successfully.");
       await refreshDashboardData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not delete deal.");
+      setDashboardError(localizeError(error, t, "errDeleteDeal"));
     }
   };
 
@@ -764,7 +765,7 @@ export default function Dashboard() {
     try {
       setInspectionCase(await getAdminCarInspection(carId));
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not load inspection data.");
+      setDashboardError(localizeError(error, t, "errLoadInspection"));
     } finally {
       setIsLoadingInspection(false);
     }
@@ -798,7 +799,7 @@ export default function Dashboard() {
       resetInspectionForms();
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not submit maintenance file.");
+      setDashboardError(localizeError(error, t, "errSubmitMaintenanceFile"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -813,7 +814,7 @@ export default function Dashboard() {
       setActionMessage("Technician visit requested - schedule it below.");
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not request a technician visit.");
+      setDashboardError(localizeError(error, t, "errRequestTechnician"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -835,7 +836,7 @@ export default function Dashboard() {
       setActionMessage("Inspection scheduled.");
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not schedule the inspection.");
+      setDashboardError(localizeError(error, t, "errScheduleInspection"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -850,7 +851,7 @@ export default function Dashboard() {
       setActionMessage("Inspection marked in progress.");
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not start the inspection.");
+      setDashboardError(localizeError(error, t, "errStartInspection"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -884,7 +885,7 @@ export default function Dashboard() {
       setActionMessage("Inspection report submitted - certify it to finalize.");
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not submit the report.");
+      setDashboardError(localizeError(error, t, "errSubmitReport"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -899,7 +900,7 @@ export default function Dashboard() {
       setActionMessage("Inspection certified - Drive X Certified badge is now live on this car.");
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not certify the inspection.");
+      setDashboardError(localizeError(error, t, "errCertifyInspection"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -916,7 +917,7 @@ export default function Dashboard() {
       setActionMessage("Inspection round cancelled.");
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not cancel the round.");
+      setDashboardError(localizeError(error, t, "errCancelRound"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -974,7 +975,7 @@ export default function Dashboard() {
       setTechnicianDialogOpen(false);
       await refreshDashboardData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not save technician.");
+      setDashboardError(localizeError(error, t, "errSaveTechnician"));
     } finally {
       setIsSavingTechnician(false);
     }
@@ -985,7 +986,7 @@ export default function Dashboard() {
       await updateTechnician(technician.id, { isActive: !technician.isActive });
       await refreshDashboardData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not update technician.");
+      setDashboardError(localizeError(error, t, "errUpdateTechnician"));
     }
   };
 
@@ -1007,7 +1008,7 @@ export default function Dashboard() {
       }
       await refreshPlatformData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not update vendor status.");
+      setDashboardError(localizeError(error, t, "errUpdateVendorStatus"));
     }
   };
 
@@ -1030,7 +1031,7 @@ export default function Dashboard() {
       await refreshDashboardData();
       await refreshPlatformData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not update listing visibility.");
+      setDashboardError(localizeError(error, t, "errUpdateListingVisibility"));
     }
   };
 
@@ -1063,7 +1064,7 @@ export default function Dashboard() {
       );
       await refreshPlatformData();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not review the complaint.");
+      setDashboardError(localizeError(error, t, "errReviewComplaint"));
     } finally {
       setIsReviewing(false);
     }
@@ -1081,7 +1082,7 @@ export default function Dashboard() {
       setActionMessage("Round flagged as fraudulent - the car listing has been hidden from the marketplace.");
       await refreshInspectionCase();
     } catch (error) {
-      setDashboardError(error instanceof Error ? error.message : "Could not flag the round.");
+      setDashboardError(localizeError(error, t, "errFlagRound"));
     } finally {
       setInspectionActionLoading(false);
     }
@@ -1783,7 +1784,7 @@ export default function Dashboard() {
                   </div>
                   <Button
                     variant="outline"
-                    onClick={() => refreshDashboardData().catch((error: Error) => setDashboardError(error.message))}
+                    onClick={() => refreshDashboardData().catch((error: Error) => setDashboardError(localizeError(error, t)))}
                     className="border-gold/30 text-gold hover:bg-gold/10"
                   >
                     {dt("refresh")}

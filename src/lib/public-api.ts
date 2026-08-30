@@ -14,6 +14,8 @@ import type {
   CustomerCarAsset,
   MaintenanceFile,
   MaintenanceRequest,
+  PasswordResetRequestResponse,
+  PasswordResetResponse,
   PublicMaintenanceHistory,
   PaginatedResponse,
 } from "./api-types";
@@ -76,6 +78,20 @@ export async function loginCustomer(email: string, password: string) {
   setCustomerAuthTokens(response.accessToken, response.refreshToken);
   setCustomerSessionProfile(response.customer);
   return response;
+}
+
+export function forgotCustomerPassword(email: string) {
+  return apiFetch<PasswordResetRequestResponse>("/v1/public/auth/forgot-password", {
+    method: "POST",
+    body: JSON.stringify({ email }),
+  });
+}
+
+export function resetCustomerPassword(token: string, newPassword: string) {
+  return apiFetch<PasswordResetResponse>("/v1/public/auth/reset-password", {
+    method: "POST",
+    body: JSON.stringify({ token, newPassword }),
+  });
 }
 
 export function getCurrentCustomer() {

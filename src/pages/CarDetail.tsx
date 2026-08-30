@@ -47,6 +47,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
+import { localizeError } from "@/lib/errors";
 
 export default function CarDetail() {
   const { id } = useParams<{ id: string }>();
@@ -129,7 +130,7 @@ export default function CarDetail() {
       const refreshed = await getCarInspection(id);
       setInspectionCase(refreshed);
     } catch (error) {
-      setInspectionRequestMessage(error instanceof Error ? error.message : "Could not submit the request.");
+      setInspectionRequestMessage(localizeError(error, t, "errSubmitRequest"));
     } finally {
       setIsRequestingInspection(false);
     }
@@ -155,7 +156,7 @@ export default function CarDetail() {
       }
     } catch (error) {
       setIsFavorite(!nextValue);
-      setFavoriteMessage(error instanceof Error ? error.message : t("couldNotUpdateFavorites"));
+      setFavoriteMessage(localizeError(error, t, "couldNotUpdateFavorites"));
     }
   };
 
@@ -181,7 +182,7 @@ export default function CarDetail() {
       setSubmitMessage(response.message || t("requestReceived"));
       setContactForm({ name: "", email: "", phone: "", message: "" });
     } catch (error) {
-      setSubmitError(error instanceof Error ? error.message : t("couldNotSendRequest"));
+      setSubmitError(localizeError(error, t, "couldNotSendRequest"));
     }
   };
 
@@ -233,7 +234,7 @@ export default function CarDetail() {
       setComplaintText("");
       setTimeout(() => setShowComplaintDialog(false), 1500);
     } catch (error) {
-      setComplaintError(error instanceof Error ? error.message : "Could not submit the report.");
+      setComplaintError(localizeError(error, t, "errSubmitReport"));
     } finally {
       setIsSubmittingComplaint(false);
     }
