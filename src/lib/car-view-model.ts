@@ -27,6 +27,7 @@ export interface CarView {
   reviews: number;
   city?: string;
   listingType: ListingType;
+  vendorId?: string;
   vendorName?: string;
   hiddenByPlatform?: boolean;
   hiddenReason?: string;
@@ -105,6 +106,7 @@ export function mapApiCarToViewModel(car: ApiCar, resolveImageUrl: (url?: string
     reviews: 0,
     city: car.city,
     listingType: car.listingType,
+    vendorId: car.vendorId,
     vendorName: car.vendorName,
     hiddenByPlatform: car.hiddenByPlatform,
     hiddenReason: car.hiddenReason,

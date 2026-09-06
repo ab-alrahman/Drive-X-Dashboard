@@ -137,6 +137,12 @@ const emptyCarForm = {
   description: "",
 };
 
+const normalizeListingType = (listingType: string, hasSalePrice?: boolean) => {
+  if (listingType === "RENT") return "RENT";
+  if (listingType === "BOTH" && !hasSalePrice) return "RENT";
+  return "SALE";
+};
+
 const emptyDealForm = {
   leadId: "",
   type: "SALE",
@@ -573,7 +579,7 @@ export default function Dashboard() {
       brand: car.brand,
       model: car.model,
       year: String(car.year),
-      listingType: car.listingType,
+      listingType: normalizeListingType(car.listingType, Boolean(car.salePrice?.amount)),
       condition: car.condition,
       status: car.status,
       salePriceAmount: car.salePrice?.amount ? String(car.salePrice.amount) : "",
@@ -599,13 +605,13 @@ export default function Dashboard() {
     listingType: carForm.listingType as CarPayload["listingType"],
     condition: carForm.condition as CarPayload["condition"],
     status: carForm.status as CarPayload["status"],
-    salePrice: carForm.salePriceAmount
+    salePrice: carForm.listingType === "SALE" && carForm.salePriceAmount
       ? { amount: Number(carForm.salePriceAmount), currency: "USD" }
       : undefined,
-    dailyRentPrice: carForm.dailyRentPriceAmount
+    dailyRentPrice: carForm.listingType === "RENT" && carForm.dailyRentPriceAmount
       ? { amount: Number(carForm.dailyRentPriceAmount), currency: "USD" }
       : undefined,
-    monthlyRentPrice: carForm.monthlyRentPriceAmount
+    monthlyRentPrice: carForm.listingType === "RENT" && carForm.monthlyRentPriceAmount
       ? { amount: Number(carForm.monthlyRentPriceAmount), currency: "USD" }
       : undefined,
     mileageKm: carForm.mileageKm ? Number(carForm.mileageKm) : undefined,
@@ -629,11 +635,11 @@ export default function Dashboard() {
       if (!carForm.brand || !carForm.model || !carForm.engine || !carForm.seats) {
         throw new Error("Brand, model, engine, and seats are required.");
       }
-      if ((carForm.listingType === "SALE" || carForm.listingType === "BOTH") && !carForm.salePriceAmount) {
+      if (carForm.listingType === "SALE" && !carForm.salePriceAmount) {
         throw new Error("Sale listings require a sale price.");
       }
       if (
-        (carForm.listingType === "RENT" || carForm.listingType === "BOTH") &&
+        carForm.listingType === "RENT" &&
         !carForm.dailyRentPriceAmount &&
         !carForm.monthlyRentPriceAmount
       ) {
@@ -2304,37 +2310,53 @@ export default function Dashboard() {
               onChange={(event) => setCarForm({ ...carForm, year: event.target.value })}
               className="bg-dark border-gold/20 text-white"
             />
-            <Input
-              type="number"
-              placeholder={dl("Sale price USD", "سعر البيع بالدولار")}
-              value={carForm.salePriceAmount}
-              onChange={(event) => setCarForm({ ...carForm, salePriceAmount: event.target.value })}
-              className="bg-dark border-gold/20 text-white"
-            />
-            <Input
-              type="number"
-              placeholder={dl("Daily rent USD", "الإيجار اليومي بالدولار")}
-              value={carForm.dailyRentPriceAmount}
-              onChange={(event) => setCarForm({ ...carForm, dailyRentPriceAmount: event.target.value })}
-              className="bg-dark border-gold/20 text-white"
-            />
-            <Input
-              type="number"
-              placeholder={dl("Monthly rent USD", "الإيجار الشهري بالدولار")}
-              value={carForm.monthlyRentPriceAmount}
-              onChange={(event) => setCarForm({ ...carForm, monthlyRentPriceAmount: event.target.value })}
-              className="bg-dark border-gold/20 text-white"
-            />
-            <Select value={carForm.listingType} onValueChange={(value) => setCarForm({ ...carForm, listingType: value })}>
+            <Select
+              value={carForm.listingType}
+              onValueChange={(value) =>
+                setCarForm({
+                  ...carForm,
+                  listingType: value,
+                  salePriceAmount: value === "SALE" ? carForm.salePriceAmount : "",
+                  dailyRentPriceAmount: value === "RENT" ? carForm.dailyRentPriceAmount : "",
+                  monthlyRentPriceAmount: value === "RENT" ? carForm.monthlyRentPriceAmount : "",
+                })
+              }
+            >
               <SelectTrigger className="bg-dark border-gold/20 text-white">
                 <SelectValue placeholder={dl("Listing type", "نوع العرض")} />
               </SelectTrigger>
               <SelectContent className="bg-dark-card border-gold/20">
                 <SelectItem value="SALE">{enumLabel("SALE")}</SelectItem>
                 <SelectItem value="RENT">{enumLabel("RENT")}</SelectItem>
-                <SelectItem value="BOTH">{enumLabel("BOTH")}</SelectItem>
               </SelectContent>
             </Select>
+            {carForm.listingType === "SALE" && (
+              <Input
+                type="number"
+                placeholder={dl("Sale price USD", "سعر البيع بالدولار")}
+                value={carForm.salePriceAmount}
+                onChange={(event) => setCarForm({ ...carForm, salePriceAmount: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+            )}
+            {carForm.listingType === "RENT" && (
+              <>
+                <Input
+                  type="number"
+                  placeholder={dl("Daily rent USD", "الإيجار اليومي بالدولار")}
+                  value={carForm.dailyRentPriceAmount}
+                  onChange={(event) => setCarForm({ ...carForm, dailyRentPriceAmount: event.target.value })}
+                  className="bg-dark border-gold/20 text-white"
+                />
+                <Input
+                  type="number"
+                  placeholder={dl("Monthly rent USD", "الإيجار الشهري بالدولار")}
+                  value={carForm.monthlyRentPriceAmount}
+                  onChange={(event) => setCarForm({ ...carForm, monthlyRentPriceAmount: event.target.value })}
+                  className="bg-dark border-gold/20 text-white"
+                />
+              </>
+            )}
             <div>
               <Select
                 value={carForm.status}

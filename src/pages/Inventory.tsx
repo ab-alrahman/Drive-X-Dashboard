@@ -44,7 +44,6 @@ const listingTypes = [
   { labelKey: "all" as const, value: "All" },
   { labelKey: "forSale" as const, value: "SALE" },
   { labelKey: "forRent" as const, value: "RENT" },
-  { labelKey: "saleAndRent" as const, value: "BOTH" },
 ];
 
 const sortOptions = [
@@ -67,7 +66,10 @@ export default function Inventory() {
   const navigate = useNavigate();
   const { t } = useI18n();
   const [searchQuery, setSearchQuery] = useState(searchParams.get("search") ?? "");
-  const [selectedCategory, setSelectedCategory] = useState(searchParams.get("category") ?? "All");
+  const initialCategory = searchParams.get("category");
+  const [selectedCategory, setSelectedCategory] = useState(
+    initialCategory === "SALE" || initialCategory === "RENT" ? initialCategory : "All"
+  );
   const [selectedBrand, setSelectedBrand] = useState(searchParams.get("brand") ?? "All");
   const [selectedFuel, setSelectedFuel] = useState("All");
   const [priceRange, setPriceRange] = useState(searchParams.get("priceRange") ?? "All");

@@ -23,11 +23,12 @@ import {
   FileText,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { getCustomerAccessToken } from "@/lib/api";
+import { getAccessToken, getAdminSessionProfile, getCustomerAccessToken, getCustomerSessionProfile } from "@/lib/api";
 import { mapApiCarToView, mapApiCarsToView, type CarView } from "@/lib/car-mapper";
 import {
   addFavoriteCar,
   createLead,
+  getCurrentCustomer,
   getCarInspection,
   getCarMaintenanceHistory,
   getFavoriteCars,
@@ -36,7 +37,7 @@ import {
   removeFavoriteCar,
   requestCarInspection,
 } from "@/lib/public-api";
-import type { InspectionCase, PublicMaintenanceRecord } from "@/lib/api-types";
+import type { AdminProfile, CustomerProfile, InspectionCase, PublicMaintenanceRecord } from "@/lib/api-types";
 import { submitCarComplaint } from "@/lib/vendors-api";
 import {
   Dialog,
@@ -48,6 +49,7 @@ import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { useI18n } from "@/lib/i18n";
 import { localizeError } from "@/lib/errors";
+import { getCurrentAdmin } from "@/lib/auth-api";
 
 export default function CarDetail() {
   const { id } = useParams<{ id: string }>();
@@ -76,6 +78,15 @@ export default function CarDetail() {
   const [complaintMessage, setComplaintMessage] = useState("");
   const [complaintError, setComplaintError] = useState("");
   const [isSubmittingComplaint, setIsSubmittingComplaint] = useState(false);
+  const [currentAdmin, setCurrentAdmin] = useState<AdminProfile | null>(null);
+  const [currentCustomer, setCurrentCustomer] = useState<CustomerProfile | null>(null);
+
+  const isOwnSellerListing = Boolean(
+    currentAdmin?.vendorId &&
+      car?.vendorId &&
+      currentAdmin.vendorId === car.vendorId &&
+      currentAdmin.role !== "PLATFORM_ADMIN"
+  );
 
   useEffect(() => {
     if (!id) return;
@@ -102,6 +113,55 @@ export default function CarDetail() {
       .then((response) => setIsFavorite(response.ids.includes(id)))
       .catch(() => undefined);
   }, [id]);
+
+  useEffect(() => {
+    if (!getCustomerAccessToken()) return;
+
+    const cachedCustomer = getCustomerSessionProfile();
+    if (cachedCustomer) {
+      try {
+        const parsed = JSON.parse(cachedCustomer) as CustomerProfile;
+        setCurrentCustomer(parsed);
+        setContactForm((form) => ({
+          ...form,
+          name: form.name || parsed.fullName || "",
+          email: form.email || parsed.email || "",
+          phone: form.phone || parsed.phone || "",
+        }));
+      } catch {
+        // Ignore stale cached profile data and rely on the authenticated request below.
+      }
+    }
+
+    getCurrentCustomer()
+      .then((customer) => {
+        setCurrentCustomer(customer);
+        setContactForm((form) => ({
+          ...form,
+          name: form.name || customer.fullName || "",
+          email: form.email || customer.email || "",
+          phone: form.phone || customer.phone || "",
+        }));
+      })
+      .catch(() => undefined);
+  }, []);
+
+  useEffect(() => {
+    if (!getAccessToken()) return;
+
+    const cachedAdmin = getAdminSessionProfile();
+    if (cachedAdmin) {
+      try {
+        setCurrentAdmin(JSON.parse(cachedAdmin) as AdminProfile);
+      } catch {
+        // Ignore stale cached profile data and rely on the authenticated request below.
+      }
+    }
+
+    getCurrentAdmin()
+      .then(setCurrentAdmin)
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     if (!id) return;
@@ -160,27 +220,68 @@ export default function CarDetail() {
     }
   };
 
+  const resolveCurrentCustomer = async () => {
+    if (currentCustomer || !getCustomerAccessToken()) return currentCustomer;
+    try {
+      const customer = await getCurrentCustomer();
+      setCurrentCustomer(customer);
+      setContactForm((form) => ({
+        ...form,
+        name: customer.fullName || form.name,
+        email: customer.email || form.email,
+        phone: customer.phone || form.phone,
+      }));
+      return customer;
+    } catch {
+      return null;
+    }
+  };
+
+  const isSellerInquiryForOwnListing = async () => {
+    if (!car || !getAccessToken()) return false;
+
+    const admin = currentAdmin ?? (await getCurrentAdmin().catch(() => null));
+    if (admin && !currentAdmin) {
+      setCurrentAdmin(admin);
+    }
+
+    return Boolean(
+      admin?.vendorId &&
+        car.vendorId &&
+        admin.vendorId === car.vendorId &&
+        admin.role !== "PLATFORM_ADMIN"
+    );
+  };
+
   const handleLeadSubmit = async () => {
     if (!car) return;
     setSubmitMessage("");
     setSubmitError("");
 
     try {
-      if (!contactForm.name || !contactForm.phone) {
+      if (isOwnSellerListing || (await isSellerInquiryForOwnListing())) {
+        throw new Error(t("sellerCannotInquireOwnCar"));
+      }
+      const leadCustomer = await resolveCurrentCustomer();
+      const fullName = leadCustomer?.fullName || contactForm.name;
+      const phone = leadCustomer?.phone || contactForm.phone;
+      const email = leadCustomer?.email || contactForm.email || undefined;
+
+      if (!fullName || !phone) {
         throw new Error(t("nameAndPhoneRequired"));
       }
       const response = await createLead({
         carId: car.id,
         intent: "BUY",
-        fullName: contactForm.name,
-        phone: contactForm.phone,
-        email: contactForm.email || undefined,
+        fullName,
+        phone,
+        email,
         city: car.city || undefined,
         message: contactForm.message || `Interested in ${car.brand} ${car.model}`,
         requestDelivery: false,
       });
       setSubmitMessage(response.message || t("requestReceived"));
-      setContactForm({ name: "", email: "", phone: "", message: "" });
+      setContactForm({ name: fullName, email: email || "", phone, message: "" });
     } catch (error) {
       setSubmitError(localizeError(error, t, "couldNotSendRequest"));
     }
@@ -422,7 +523,14 @@ export default function CarDetail() {
 
               <div className="grid grid-cols-2 gap-3">
                 <Button
-                  onClick={() => setShowContact(true)}
+                  onClick={() => {
+                    if (isOwnSellerListing) {
+                      setSubmitError(t("sellerCannotInquireOwnCar"));
+                      return;
+                    }
+                    setShowContact(true);
+                  }}
+                  disabled={isOwnSellerListing}
                   className="bg-gold hover:bg-gold-light text-dark font-bold py-6 shadow-glow hover:shadow-glow-lg transition-all"
                 >
                   <Phone className="w-5 h-5 mr-2" />
@@ -430,7 +538,14 @@ export default function CarDetail() {
                 </Button>
                 <Button
                   variant="outline"
-                  onClick={() => setShowContact(true)}
+                  onClick={() => {
+                    if (isOwnSellerListing) {
+                      setSubmitError(t("sellerCannotInquireOwnCar"));
+                      return;
+                    }
+                    setShowContact(true);
+                  }}
+                  disabled={isOwnSellerListing}
                   className="border-gold/30 text-gold hover:bg-gold/10 py-6"
                 >
                   <MessageSquare className="w-5 h-5 mr-2" />
@@ -444,6 +559,9 @@ export default function CarDetail() {
               >
                 Report an issue with this listing
               </button>
+              {isOwnSellerListing && (
+                <p className="mt-3 text-sm text-orange-300">{t("sellerCannotInquireOwnCar")}</p>
+              )}
             </div>
 
             {/* Quick Specs */}
@@ -714,10 +832,16 @@ export default function CarDetail() {
               <p className="text-white/60">${car.price.toLocaleString()}</p>
             </div>
             <div className="space-y-3">
+              {currentCustomer && (
+                <div className="rounded-lg border border-gold/20 bg-gold/10 p-3 text-sm text-gold">
+                  {t("customerDetailsLoaded")}
+                </div>
+              )}
               <Input
                 placeholder={t("yourName")}
                 value={contactForm.name}
                 onChange={(e) => setContactForm({ ...contactForm, name: e.target.value })}
+                readOnly={Boolean(currentCustomer)}
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30"
               />
               <Input
@@ -725,6 +849,7 @@ export default function CarDetail() {
                 placeholder={t("emailAddress")}
                 value={contactForm.email}
                 onChange={(e) => setContactForm({ ...contactForm, email: e.target.value })}
+                readOnly={Boolean(currentCustomer)}
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30"
               />
               <Input
@@ -732,6 +857,7 @@ export default function CarDetail() {
                 placeholder={t("phoneNumber")}
                 value={contactForm.phone}
                 onChange={(e) => setContactForm({ ...contactForm, phone: e.target.value })}
+                readOnly={Boolean(currentCustomer)}
                 className="bg-dark border-gold/20 text-white placeholder:text-white/30"
               />
               <Textarea
@@ -751,7 +877,11 @@ export default function CarDetail() {
                 {submitError}
               </div>
             )}
-            <Button onClick={handleLeadSubmit} className="w-full bg-gold hover:bg-gold-light text-dark font-bold">
+            <Button
+              onClick={handleLeadSubmit}
+              disabled={isOwnSellerListing}
+              className="w-full bg-gold hover:bg-gold-light text-dark font-bold"
+            >
               <Mail className="w-5 h-5 mr-2" />
               {t("sendMessage")}
             </Button>

@@ -27,7 +27,6 @@ const listingTypeOptions = [
   { value: "All", labelKey: "all" as const },
   { value: "SALE", labelKey: "forSale" as const },
   { value: "RENT", labelKey: "forRent" as const },
-  { value: "BOTH", labelKey: "saleAndRent" as const },
 ];
 
 export default function Home() {
@@ -49,7 +48,7 @@ export default function Home() {
 
   useEffect(() => {
     Promise.all(
-      ["SALE", "RENT", "BOTH"].map((listingType) =>
+      ["SALE", "RENT"].map((listingType) =>
         getPublicCars({ listingType, limit: 1 }).then((response) => [listingType, response.total] as const)
       )
     )
@@ -84,40 +83,29 @@ export default function Home() {
   const localizedTestimonials = [
     {
       id: 1,
-      name: language === "ar" ? "أحمد الراشد" : "Ahmed Al-Rashid",
-      role: language === "ar" ? "صاحب شركة" : "Business Owner",
-      avatar: language === "ar" ? "أ" : "A",
-      text:
-        language === "ar"
-          ? "كانت تجربة شراء السيارة واضحة وسلسة من أول زيارة حتى الاستلام. ساعدني فريق Drive X في مقارنة الخيارات واختيار BMW M8 بمواصفات ممتازة، وكل خطوة كانت منظمة ومحترفة."
-          : "The most seamless car buying experience I've ever had. The showroom is incredible, and the team went above and beyond to find my dream car. The BMW M8 I purchased exceeded all expectations.",
+      name: t("testimonial1Name"),
+      role: t("testimonial1Role"),
+      avatar: t("testimonial1Avatar"),
+      text: t("testimonial1Text"),
       car: "BMW M8 Competition",
     },
     {
       id: 2,
-      name: language === "ar" ? "خالد بن سعد" : "Khalid Bin Saad",
-      role: language === "ar" ? "رئيس تنفيذي، Tech Ventures" : "CEO, Tech Ventures",
-      avatar: language === "ar" ? "خ" : "K",
-      text:
-        language === "ar"
-          ? "تعاملت مع معارض كثيرة، لكن Drive X مختلف في الوضوح والاهتمام بالتفاصيل. السعر كان شفافاً، والمتابعة بعد الشراء ممتازة، ووصلت Porsche Taycan بحالة مثالية."
-          : "I've bought cars from dealerships worldwide, but Drive X stands apart. Their attention to detail, transparent pricing, and after-sales service are world-class. My Porsche Taycan was delivered in perfect condition.",
+      name: t("testimonial2Name"),
+      role: t("testimonial2Role"),
+      avatar: t("testimonial2Avatar"),
+      text: t("testimonial2Text"),
       car: "Porsche Taycan Turbo S",
     },
     {
       id: 3,
-      name: language === "ar" ? "محمد الفارسي" : "Mohammed Al-Farsi",
-      role: language === "ar" ? "مصرفي استثماري" : "Investment Banker",
-      avatar: language === "ar" ? "م" : "M",
-      text:
-        language === "ar"
-          ? "عندما تختار سيارة بهذا المستوى، تتوقع دقة في كل تفصيلة. Drive X قدمت تجربة تليق بالسيارة؛ Ferrari SF90 كانت نظيفة بالكامل، والإجراءات تمت باحترافية عالية."
-          : "When you're spending half a million on a car, you expect perfection. Drive X delivered exactly that. The Ferrari SF90 was immaculate, and the entire process was handled with utmost professionalism.",
+      name: t("testimonial3Name"),
+      role: t("testimonial3Role"),
+      avatar: t("testimonial3Avatar"),
+      text: t("testimonial3Text"),
       car: "Ferrari SF90 Stradale",
     },
   ];
-
-  const isRtl = language === "ar";
 
   const nextTestimonial = () => {
     setActiveTestimonial((current) => (current + 1) % localizedTestimonials.length);
@@ -554,13 +542,17 @@ export default function Home() {
               </button>
             </div>
 
-            <div className="bg-dark-card border border-gold/20 rounded-2xl overflow-hidden">
+            <div className="bg-dark-card border border-gold/20 rounded-2xl overflow-hidden" dir="ltr">
               <div
                 className="flex transition-transform duration-700 ease-out"
-                style={{ transform: `translateX(${isRtl ? activeTestimonial * 100 : -activeTestimonial * 100}%)` }}
+                style={{ transform: `translateX(-${activeTestimonial * 100}%)` }}
               >
                 {localizedTestimonials.map((testimonial) => (
-                  <article key={testimonial.id} className="min-w-full p-8 md:p-12">
+                  <article
+                    key={testimonial.id}
+                    dir={language === "ar" ? "rtl" : "ltr"}
+                    className="min-w-full shrink-0 p-8 md:p-12"
+                  >
                     <Quote className="w-12 h-12 text-gold/30 mb-6" />
 
                     <div className="min-h-[230px] flex flex-col justify-between">
