@@ -9,6 +9,7 @@ import {
   LayoutDashboard,
   Search,
   Heart,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -193,13 +194,22 @@ export default function Navbar() {
                     </div>
                   </div>
                   {session.isAdminLoggedIn && (
-                    <DropdownMenuItem
-                      onClick={() => navigate("/dashboard")}
-                      className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
-                    >
-                      <LayoutDashboard className="mr-2 h-4 w-4" />
-                      {t("dashboard")}
-                    </DropdownMenuItem>
+                    <>
+                      <DropdownMenuItem
+                        onClick={() => navigate("/dashboard")}
+                        className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
+                      >
+                        <LayoutDashboard className="mr-2 h-4 w-4" />
+                        {t("dashboard")}
+                      </DropdownMenuItem>
+                      <DropdownMenuItem
+                        onClick={() => navigate("/maintenance-shops")}
+                        className="text-white/80 hover:text-gold hover:bg-gold/10 cursor-pointer"
+                      >
+                        <Wrench className="mr-2 h-4 w-4" />
+                        {t("maintenanceShops")}
+                      </DropdownMenuItem>
+                    </>
                   )}
                   {!session.isAdminLoggedIn && session.isLoggedIn && (
                     <DropdownMenuItem
@@ -295,13 +305,22 @@ export default function Navbar() {
                 {session.isLoggedIn ? (
                   <>
                     {session.isAdminLoggedIn && (
-                      <Link
-                        to="/dashboard"
-                        onClick={() => setMobileMenuOpen(false)}
-                        className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
-                      >
-                        <LayoutDashboard className="w-4 h-4" /> {t("dashboard")}
-                      </Link>
+                      <>
+                        <Link
+                          to="/dashboard"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
+                        >
+                          <LayoutDashboard className="w-4 h-4" /> {t("dashboard")}
+                        </Link>
+                        <Link
+                          to="/maintenance-shops"
+                          onClick={() => setMobileMenuOpen(false)}
+                          className="flex items-center gap-2 px-4 py-3 text-white/70 hover:text-gold"
+                        >
+                          <Wrench className="w-4 h-4" /> {t("maintenanceShops")}
+                        </Link>
+                      </>
                     )}
                     {!session.isAdminLoggedIn && session.isLoggedIn && (
                       <Link

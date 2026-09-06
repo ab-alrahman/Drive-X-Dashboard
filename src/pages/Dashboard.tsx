@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from "react";
+import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate, Link } from "react-router";
 import {
   LayoutDashboard,
@@ -141,6 +141,40 @@ const normalizeListingType = (listingType: string, hasSalePrice?: boolean) => {
   if (listingType === "RENT") return "RENT";
   if (listingType === "BOTH" && !hasSalePrice) return "RENT";
   return "SALE";
+};
+
+const nonNegativeNumberInputProps = {
+  min: 0,
+  inputMode: "decimal" as const,
+  onKeyDown: (event: KeyboardEvent<HTMLInputElement>) => {
+    if (["-", "+", "e", "E"].includes(event.key)) {
+      event.preventDefault();
+    }
+  },
+};
+
+const sanitizeNonNegativeNumberInput = (value: string) => {
+  if (!value) return "";
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) return "";
+  return numericValue < 0 ? "0" : value;
+};
+
+const parseNonNegativeNumber = (
+  value: string,
+  label: string,
+  options: { required?: boolean; positive?: boolean } = {}
+) => {
+  if (!value) {
+    if (options.required) throw new Error(`${label} is required.`);
+    return undefined;
+  }
+
+  const numericValue = Number(value);
+  if (!Number.isFinite(numericValue)) throw new Error(`${label} must be a valid number.`);
+  if (numericValue < 0) throw new Error(`${label} cannot be less than zero.`);
+  if (options.positive && numericValue <= 0) throw new Error(`${label} must be greater than zero.`);
+  return numericValue;
 };
 
 const emptyDealForm = {
@@ -484,7 +518,10 @@ export default function Dashboard() {
     if (!selectedMaintenanceRequest || !maintenanceQuoteAmount) return;
     setIsSavingMaintenanceAction(true);
     try {
-      const quote = Number(maintenanceQuoteAmount);
+      const quote = parseNonNegativeNumber(maintenanceQuoteAmount, "Quote amount", {
+        required: true,
+        positive: true,
+      }) ?? 0;
       await updateMaintenanceRequestStatus(selectedMaintenanceRequest.id, {
         status: "WAITING_CUSTOMER_APPROVAL",
         quotedAmount: quote,
@@ -598,34 +635,48 @@ export default function Dashboard() {
     setCarDialogOpen(true);
   };
 
-  const carPayloadFromForm = (): CarPayload => ({
-    brand: carForm.brand,
-    model: carForm.model,
-    year: Number(carForm.year),
-    listingType: carForm.listingType as CarPayload["listingType"],
-    condition: carForm.condition as CarPayload["condition"],
-    status: carForm.status as CarPayload["status"],
-    salePrice: carForm.listingType === "SALE" && carForm.salePriceAmount
-      ? { amount: Number(carForm.salePriceAmount), currency: "USD" }
-      : undefined,
-    dailyRentPrice: carForm.listingType === "RENT" && carForm.dailyRentPriceAmount
-      ? { amount: Number(carForm.dailyRentPriceAmount), currency: "USD" }
-      : undefined,
-    monthlyRentPrice: carForm.listingType === "RENT" && carForm.monthlyRentPriceAmount
-      ? { amount: Number(carForm.monthlyRentPriceAmount), currency: "USD" }
-      : undefined,
-    mileageKm: carForm.mileageKm ? Number(carForm.mileageKm) : undefined,
-    transmission: carForm.transmission as CarPayload["transmission"],
-    fuelType: carForm.fuelType as CarPayload["fuelType"],
-    color: carForm.color || undefined,
-    city: carForm.city || undefined,
-    specs: {
-      engine: carForm.engine,
-      seats: Number(carForm.seats),
-      horsepower: carForm.horsepower ? Number(carForm.horsepower) : undefined,
-    },
-    description: carForm.description || undefined,
-  });
+  const carPayloadFromForm = (): CarPayload => {
+    const salePriceAmount =
+      carForm.listingType === "SALE"
+        ? parseNonNegativeNumber(carForm.salePriceAmount, "Sale price", { required: true, positive: true })
+        : undefined;
+    const dailyRentPriceAmount =
+      carForm.listingType === "RENT"
+        ? parseNonNegativeNumber(carForm.dailyRentPriceAmount, "Daily rent", { positive: true })
+        : undefined;
+    const monthlyRentPriceAmount =
+      carForm.listingType === "RENT"
+        ? parseNonNegativeNumber(carForm.monthlyRentPriceAmount, "Monthly rent", { positive: true })
+        : undefined;
+
+    if (carForm.listingType === "RENT" && dailyRentPriceAmount === undefined && monthlyRentPriceAmount === undefined) {
+      throw new Error("Rent listings require a daily or monthly rent price.");
+    }
+
+    return {
+      brand: carForm.brand,
+      model: carForm.model,
+      year: parseNonNegativeNumber(carForm.year, "Year", { required: true, positive: true }) ?? 0,
+      listingType: carForm.listingType as CarPayload["listingType"],
+      condition: carForm.condition as CarPayload["condition"],
+      status: carForm.status as CarPayload["status"],
+      salePrice: salePriceAmount !== undefined ? { amount: salePriceAmount, currency: "USD" } : undefined,
+      dailyRentPrice: dailyRentPriceAmount !== undefined ? { amount: dailyRentPriceAmount, currency: "USD" } : undefined,
+      monthlyRentPrice:
+        monthlyRentPriceAmount !== undefined ? { amount: monthlyRentPriceAmount, currency: "USD" } : undefined,
+      mileageKm: parseNonNegativeNumber(carForm.mileageKm, "Mileage"),
+      transmission: carForm.transmission as CarPayload["transmission"],
+      fuelType: carForm.fuelType as CarPayload["fuelType"],
+      color: carForm.color || undefined,
+      city: carForm.city || undefined,
+      specs: {
+        engine: carForm.engine,
+        seats: parseNonNegativeNumber(carForm.seats, "Seats", { required: true, positive: true }) ?? 0,
+        horsepower: parseNonNegativeNumber(carForm.horsepower, "Horsepower"),
+      },
+      description: carForm.description || undefined,
+    };
+  };
 
   const handleSaveCar = async () => {
     setIsSavingCar(true);
@@ -635,18 +686,9 @@ export default function Dashboard() {
       if (!carForm.brand || !carForm.model || !carForm.engine || !carForm.seats) {
         throw new Error("Brand, model, engine, and seats are required.");
       }
-      if (carForm.listingType === "SALE" && !carForm.salePriceAmount) {
-        throw new Error("Sale listings require a sale price.");
-      }
-      if (
-        carForm.listingType === "RENT" &&
-        !carForm.dailyRentPriceAmount &&
-        !carForm.monthlyRentPriceAmount
-      ) {
-        throw new Error("Rent listings require a daily or monthly rent price.");
-      }
+      const payload = carPayloadFromForm();
       if (editingCarId) {
-        await updateAdminCar(editingCarId, carPayloadFromForm());
+        await updateAdminCar(editingCarId, payload);
         setActionMessage(t("successCarUpdated"));
         setCarDialogOpen(false);
       } else {
@@ -654,7 +696,7 @@ export default function Dashboard() {
         // maintenance file/inspection - the backend enforces this, so force a safe status
         // on create regardless of what the form's Status field says, then guide the admin
         // straight into submitting that inspection for the car they just made.
-        const created = await createAdminCar({ ...carPayloadFromForm(), status: "INACTIVE" });
+        const created = await createAdminCar({ ...payload, status: "INACTIVE" });
         setActionMessage(t("successCarCreatedInactive"));
         setCarDialogOpen(false);
         openInspectionDialog(created.id);
@@ -719,12 +761,16 @@ export default function Dashboard() {
       if (!dealForm.finalPriceAmount) {
         throw new Error("Final price is required.");
       }
+      const finalPriceAmount = parseNonNegativeNumber(dealForm.finalPriceAmount, "Final price", {
+        required: true,
+        positive: true,
+      }) ?? 0;
 
       await createAdminDeal({
         leadId: lead.id,
         carId: lead.carId,
         type: dealForm.type as "SALE" | "RENT",
-        finalPrice: { amount: Number(dealForm.finalPriceAmount), currency: "USD" },
+        finalPrice: { amount: finalPriceAmount, currency: "USD" },
         notes: dealForm.notes || undefined,
       });
       setActionMessage(t("successDealCreated"));
@@ -878,12 +924,12 @@ export default function Dashboard() {
         .map((row) => ({
           description: row.description.trim(),
           severity: row.severity,
-          estimatedRepairCostAmount: row.costAmount ? Number(row.costAmount) : undefined,
+          estimatedRepairCostAmount: parseNonNegativeNumber(row.costAmount, "Repair cost"),
           estimatedRepairCostCurrency: row.costAmount ? ("USD" as const) : undefined,
         }));
       await submitInspectionReport(latestInspectionRound.id, {
         overallVerdict: reportVerdict || undefined,
-        priceAmount: reportPriceAmount ? Number(reportPriceAmount) : undefined,
+        priceAmount: parseNonNegativeNumber(reportPriceAmount, "Inspection price"),
         priceCurrency: reportPriceAmount ? "USD" : undefined,
         paidBy: reportPaidBy,
         findings,
@@ -2305,9 +2351,10 @@ export default function Dashboard() {
             />
             <Input
               type="number"
+              {...nonNegativeNumberInputProps}
               placeholder={dl("Year", "السنة")}
               value={carForm.year}
-              onChange={(event) => setCarForm({ ...carForm, year: event.target.value })}
+              onChange={(event) => setCarForm({ ...carForm, year: sanitizeNonNegativeNumberInput(event.target.value) })}
               className="bg-dark border-gold/20 text-white"
             />
             <Select
@@ -2333,9 +2380,12 @@ export default function Dashboard() {
             {carForm.listingType === "SALE" && (
               <Input
                 type="number"
+                {...nonNegativeNumberInputProps}
                 placeholder={dl("Sale price USD", "سعر البيع بالدولار")}
                 value={carForm.salePriceAmount}
-                onChange={(event) => setCarForm({ ...carForm, salePriceAmount: event.target.value })}
+                onChange={(event) =>
+                  setCarForm({ ...carForm, salePriceAmount: sanitizeNonNegativeNumberInput(event.target.value) })
+                }
                 className="bg-dark border-gold/20 text-white"
               />
             )}
@@ -2343,16 +2393,28 @@ export default function Dashboard() {
               <>
                 <Input
                   type="number"
+                  {...nonNegativeNumberInputProps}
                   placeholder={dl("Daily rent USD", "الإيجار اليومي بالدولار")}
                   value={carForm.dailyRentPriceAmount}
-                  onChange={(event) => setCarForm({ ...carForm, dailyRentPriceAmount: event.target.value })}
+                  onChange={(event) =>
+                    setCarForm({
+                      ...carForm,
+                      dailyRentPriceAmount: sanitizeNonNegativeNumberInput(event.target.value),
+                    })
+                  }
                   className="bg-dark border-gold/20 text-white"
                 />
                 <Input
                   type="number"
+                  {...nonNegativeNumberInputProps}
                   placeholder={dl("Monthly rent USD", "الإيجار الشهري بالدولار")}
                   value={carForm.monthlyRentPriceAmount}
-                  onChange={(event) => setCarForm({ ...carForm, monthlyRentPriceAmount: event.target.value })}
+                  onChange={(event) =>
+                    setCarForm({
+                      ...carForm,
+                      monthlyRentPriceAmount: sanitizeNonNegativeNumberInput(event.target.value),
+                    })
+                  }
                   className="bg-dark border-gold/20 text-white"
                 />
               </>
@@ -2408,9 +2470,10 @@ export default function Dashboard() {
             </Select>
             <Input
               type="number"
+              {...nonNegativeNumberInputProps}
               placeholder={dl("Mileage km", "المسافة بالكيلومتر")}
               value={carForm.mileageKm}
-              onChange={(event) => setCarForm({ ...carForm, mileageKm: event.target.value })}
+              onChange={(event) => setCarForm({ ...carForm, mileageKm: sanitizeNonNegativeNumberInput(event.target.value) })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
@@ -2433,16 +2496,20 @@ export default function Dashboard() {
             />
             <Input
               type="number"
+              {...nonNegativeNumberInputProps}
               placeholder={dl("Seats", "عدد المقاعد")}
               value={carForm.seats}
-              onChange={(event) => setCarForm({ ...carForm, seats: event.target.value })}
+              onChange={(event) => setCarForm({ ...carForm, seats: sanitizeNonNegativeNumberInput(event.target.value) })}
               className="bg-dark border-gold/20 text-white"
             />
             <Input
               type="number"
+              {...nonNegativeNumberInputProps}
               placeholder={dl("Horsepower", "القوة الحصانية")}
               value={carForm.horsepower}
-              onChange={(event) => setCarForm({ ...carForm, horsepower: event.target.value })}
+              onChange={(event) =>
+                setCarForm({ ...carForm, horsepower: sanitizeNonNegativeNumberInput(event.target.value) })
+              }
               className="bg-dark border-gold/20 text-white"
             />
             <Textarea
@@ -2507,9 +2574,12 @@ export default function Dashboard() {
               </Select>
               <Input
                 type="number"
+                {...nonNegativeNumberInputProps}
                 placeholder={dl("Final price USD", "السعر النهائي بالدولار")}
                 value={dealForm.finalPriceAmount}
-                onChange={(event) => setDealForm({ ...dealForm, finalPriceAmount: event.target.value })}
+                onChange={(event) =>
+                  setDealForm({ ...dealForm, finalPriceAmount: sanitizeNonNegativeNumberInput(event.target.value) })
+                }
                 className="bg-dark border-gold/20 text-white"
               />
             </div>
@@ -2755,9 +2825,10 @@ export default function Dashboard() {
                     <div className="grid grid-cols-2 gap-4">
                       <Input
                         type="number"
+                        {...nonNegativeNumberInputProps}
                         placeholder={dl("Price USD", "السعر بالدولار")}
                         value={reportPriceAmount}
-                        onChange={(event) => setReportPriceAmount(event.target.value)}
+                        onChange={(event) => setReportPriceAmount(sanitizeNonNegativeNumberInput(event.target.value))}
                         className="bg-dark border-gold/20 text-white"
                       />
                       <Select value={reportPaidBy} onValueChange={(value) => setReportPaidBy(value as InspectionPaidBy)}>
@@ -2802,9 +2873,14 @@ export default function Dashboard() {
                           </Select>
                           <Input
                             type="number"
+                            {...nonNegativeNumberInputProps}
                             placeholder={dl("Cost USD", "التكلفة بالدولار")}
                             value={finding.costAmount}
-                            onChange={(event) => updateFindingRow(index, { costAmount: event.target.value })}
+                            onChange={(event) =>
+                              updateFindingRow(index, {
+                                costAmount: sanitizeNonNegativeNumberInput(event.target.value),
+                              })
+                            }
                             className="bg-dark border-gold/20 text-white text-sm w-28"
                           />
                           <Button
@@ -2890,10 +2966,10 @@ export default function Dashboard() {
                   <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3">
                     <Input
                       type="number"
-                      min="0"
+                      {...nonNegativeNumberInputProps}
                       placeholder={dl("Amount in USD", "المبلغ بالدولار")}
                       value={maintenanceQuoteAmount}
-                      onChange={(event) => setMaintenanceQuoteAmount(event.target.value)}
+                      onChange={(event) => setMaintenanceQuoteAmount(sanitizeNonNegativeNumberInput(event.target.value))}
                       className="bg-dark border-gold/20 text-white"
                     />
                     <Button

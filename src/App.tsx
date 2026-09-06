@@ -12,6 +12,7 @@ import Inventory from './pages/Inventory'
 import CarDetail from './pages/CarDetail'
 import Dashboard from './pages/Dashboard'
 import CustomerDashboard from './pages/CustomerDashboard'
+import MaintenanceShops from './pages/MaintenanceShops'
 import About from './pages/About'
 import Contact from './pages/Contact'
 import RequireAuth from './components/RequireAuth'
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/car/:id" element={<CarDetail />} />
           <Route path="/dashboard" element={<RequireAuth role="admin"><Dashboard /></RequireAuth>} />
+          <Route path="/maintenance-shops" element={<RequireAuth role="admin"><MaintenanceShops /></RequireAuth>} />
           <Route path="/my-dashboard" element={<RequireAuth role="customer"><CustomerDashboard /></RequireAuth>} />
           <Route path="/about" element={<About />} />
           <Route path="/contact" element={<Contact />} />
