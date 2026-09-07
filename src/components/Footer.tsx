@@ -5,6 +5,7 @@ import { useI18n, type MessageKey } from "@/lib/i18n";
 
 export default function Footer() {
   const { t } = useI18n();
+  const currentYear = new Date().getFullYear();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
@@ -105,7 +106,7 @@ export default function Footer() {
         </div>
 
         <div className="border-t border-gold/20 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-white/40 text-sm">© 2024 Drive X. {t("allRightsReserved")}</p>
+          <p className="text-white/40 text-sm">© {currentYear} Drive X. {t("allRightsReserved")}</p>
           <div className="flex items-center gap-6">
             <span className="text-white/40 text-sm hover:text-gold cursor-pointer transition-colors">{t("privacyPolicy")}</span>
             <span className="text-white/40 text-sm hover:text-gold cursor-pointer transition-colors">{t("termsOfService")}</span>
