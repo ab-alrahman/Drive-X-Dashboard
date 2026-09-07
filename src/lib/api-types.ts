@@ -370,6 +370,8 @@ export interface MaintenanceRequest {
   vendorName?: string;
   assignedPartnerId?: string;
   assignedPartnerName?: string;
+  preferredPartnerId?: string;
+  preferredPartnerName?: string;
   requestType: MaintenanceRequestType;
   status: MaintenanceStatus;
   city: string;
@@ -431,10 +433,56 @@ export interface PublicMaintenanceHistory {
 export interface CreateMaintenanceRequest {
   carId: string;
   dealId?: string;
+  preferredWorkshopId?: string;
   requestType: MaintenanceRequestType;
   city: string;
   preferredTime?: string;
   pickupNeeded?: boolean;
   notes: string;
   contactPhone: string;
+}
+
+export interface MaintenanceWorkshop {
+  id: string;
+  name: string;
+  city: string;
+  phone?: string;
+  specialty?: string;
+  serviceTiers: InspectionServiceTier[];
+}
+
+export type ChatSenderType = "CUSTOMER" | "VENDOR";
+
+export interface ChatThread {
+  id: string;
+  carId: string;
+  customerId: string;
+  customerName?: string;
+  vendorId: string;
+  vendorName?: string;
+  lastMessageAt: string;
+  createdAt: string;
+  lastMessagePreview?: string;
+  unreadCount: number;
+  car?: {
+    brand: string;
+    model: string;
+    year: number;
+    imageUrl?: string;
+  };
+}
+
+export interface ChatMessage {
+  id: string;
+  threadId: string;
+  senderType: ChatSenderType;
+  senderId: string;
+  body: string;
+  readAt?: string;
+  createdAt: string;
+}
+
+export interface ChatThreadWithMessages {
+  thread: ChatThread;
+  messages: ChatMessage[];
 }

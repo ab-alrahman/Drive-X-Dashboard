@@ -22,6 +22,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ChatPanel from "@/components/ChatPanel";
 import { clearCustomerAuthTokens, getCustomerAccessToken, setCustomerSessionProfile } from "@/lib/api";
 import {
   approveMaintenanceQuote,
@@ -29,15 +30,17 @@ import {
   createMaintenanceRequest,
   getCurrentCustomer,
   getFavoriteCars,
+  getMaintenanceWorkshops,
   getMyCars,
   getMyLeads,
   getMyMaintenanceRequest,
   getMyMaintenanceRequests,
+  getPublicCars,
   rejectMaintenanceQuote,
   updateMyProfile,
   uploadMaintenanceRequestFile,
 } from "@/lib/public-api";
-import type { ApiCar, LeadResponse, CustomerProfile, CustomerCarAsset, MaintenanceRequest, MaintenanceRequestType } from "@/lib/api-types";
+import type { ApiCar, LeadResponse, CustomerProfile, CustomerCarAsset, MaintenanceRequest, MaintenanceRequestType, MaintenanceWorkshop } from "@/lib/api-types";
 import { resolveAssetUrl } from "@/lib/api";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 import { localizeError } from "@/lib/errors";
@@ -45,15 +48,15 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/u
 import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 
-type Tab = "cars" | "maintenance" | "inquiries" | "favorites" | "profile";
+type Tab = "cars" | "maintenance" | "messages" | "inquiries" | "favorites" | "profile";
 
-const maintenanceTypes: Array<{ value: MaintenanceRequestType; label: string }> = [
-  { value: "ROUTINE_SERVICE", label: "Routine service" },
-  { value: "REPAIR", label: "Repair" },
-  { value: "DIAGNOSTIC", label: "Diagnostic" },
-  { value: "BODY_PAINT", label: "Body / paint" },
-  { value: "TIRES_BRAKES", label: "Tires / brakes" },
-  { value: "OTHER", label: "Other" },
+const maintenanceTypes: Array<{ value: MaintenanceRequestType; labelKey: MessageKey }> = [
+  { value: "ROUTINE_SERVICE", labelKey: "mntTypeRoutineService" },
+  { value: "REPAIR", labelKey: "mntTypeRepair" },
+  { value: "DIAGNOSTIC", labelKey: "mntTypeDiagnostic" },
+  { value: "BODY_PAINT", labelKey: "mntTypeBodyPaint" },
+  { value: "TIRES_BRAKES", labelKey: "mntTypeTiresBrakes" },
+  { value: "OTHER", labelKey: "mntTypeOther" },
 ];
 
 export default function CustomerDashboard() {
@@ -77,8 +80,12 @@ export default function CustomerDashboard() {
   const [maintenanceFile, setMaintenanceFile] = useState<File | null>(null);
   const [isUploadingMaintenanceFile, setIsUploadingMaintenanceFile] = useState(false);
   const [maintenanceDetailMessage, setMaintenanceDetailMessage] = useState("");
+  const [workshops, setWorkshops] = useState<MaintenanceWorkshop[]>([]);
+  const [allCars, setAllCars] = useState<ApiCar[]>([]);
   const [maintenanceForm, setMaintenanceForm] = useState({
+    carId: "",
     requestType: "ROUTINE_SERVICE" as MaintenanceRequestType,
+    preferredWorkshopId: "",
     city: "",
     preferredTime: "",
     pickupNeeded: false,
@@ -103,12 +110,14 @@ export default function CustomerDashboard() {
     setLoading(true);
     setError("");
     try {
-      const [profileData, leadsData, favsData, carsData, maintenanceData] = await Promise.all([
+      const [profileData, leadsData, favsData, carsData, maintenanceData, workshopsData, allCarsData] = await Promise.all([
         getCurrentCustomer(),
         getMyLeads({ page: 1, limit: 50 }),
         getFavoriteCars(),
         getMyCars(),
         getMyMaintenanceRequests({ page: 1, limit: 50 }),
+        getMaintenanceWorkshops().catch(() => [] as MaintenanceWorkshop[]),
+        getPublicCars({ page: 1, limit: 200 }).catch(() => ({ items: [] as ApiCar[] })),
       ]);
       setProfile(profileData);
       setProfileForm({ fullName: profileData.fullName, phone: profileData.phone ?? "" });
@@ -116,6 +125,8 @@ export default function CustomerDashboard() {
       setFavorites(favsData.items);
       setMyCars(carsData);
       setMaintenanceRequests(maintenanceData.items);
+      setWorkshops(workshopsData);
+      setAllCars(allCarsData.items);
       setMaintenanceForm((current) => ({ ...current, contactPhone: profileData.phone ?? "" }));
     } catch (err) {
       setError(localizeError(err, t, "failedToLoadDashboard"));
@@ -134,10 +145,29 @@ export default function CustomerDashboard() {
 
   useEffect(() => {
     const requestedTab = new URLSearchParams(location.search).get("tab");
-    if (requestedTab === "cars" || requestedTab === "maintenance" || requestedTab === "inquiries" || requestedTab === "favorites" || requestedTab === "profile") {
+    if (
+      requestedTab === "cars" ||
+      requestedTab === "maintenance" ||
+      requestedTab === "messages" ||
+      requestedTab === "inquiries" ||
+      requestedTab === "favorites" ||
+      requestedTab === "profile"
+    ) {
       setActiveTab(requestedTab);
     }
   }, [location.search]);
+
+  // Deep link from a car page: /my-dashboard?tab=maintenance&requestCarId=<id>
+  useEffect(() => {
+    if (loading) return;
+    const params = new URLSearchParams(location.search);
+    const requestCarId = params.get("requestCarId");
+    if (!requestCarId) return;
+    openMaintenanceDialogForCar(requestCarId);
+    params.delete("requestCarId");
+    navigate({ search: params.toString() }, { replace: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, location.search]);
 
   const handleLogout = () => {
     clearCustomerAuthTokens();
@@ -163,30 +193,49 @@ export default function CustomerDashboard() {
     }
   };
 
-  const openMaintenanceDialog = (asset: CustomerCarAsset) => {
-    setSelectedAsset(asset);
+  const resetMaintenanceForm = (carId = "") => {
     setMaintenanceMessage("");
     setMaintenanceForm({
+      carId,
       requestType: "ROUTINE_SERVICE",
+      preferredWorkshopId: "",
       city: "",
       preferredTime: "",
       pickupNeeded: false,
       contactPhone: profile?.phone ?? "",
       notes: "",
     });
+  };
+
+  const openMaintenanceDialog = (asset: CustomerCarAsset) => {
+    setSelectedAsset(asset);
+    resetMaintenanceForm(asset.car.id);
+    setMaintenanceDialogOpen(true);
+  };
+
+  // Request maintenance for ANY Drive X car (not only cars the customer owns).
+  const openMaintenanceDialogForCar = (carId = "") => {
+    setSelectedAsset(null);
+    resetMaintenanceForm(carId);
     setMaintenanceDialogOpen(true);
   };
 
   const handleMaintenanceSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!selectedAsset) return;
+
+    const carId = selectedAsset?.car.id ?? maintenanceForm.carId;
+    if (!carId) {
+      setMaintenanceMessage(t("mntSelectCarRequired"));
+      return;
+    }
 
     setSavingMaintenance(true);
     setMaintenanceMessage("");
     try {
       await createMaintenanceRequest({
-        carId: selectedAsset.car.id,
-        dealId: selectedAsset.dealId,
+        carId,
+        dealId: selectedAsset?.dealId,
+        preferredWorkshopId: maintenanceForm.preferredWorkshopId || undefined,
         requestType: maintenanceForm.requestType,
         city: maintenanceForm.city,
         preferredTime: maintenanceForm.preferredTime ? new Date(maintenanceForm.preferredTime).toISOString() : undefined,
@@ -233,7 +282,7 @@ export default function CustomerDashboard() {
       await uploadMaintenanceRequestFile(selectedMaintenanceRequest.id, maintenanceFile);
       setMaintenanceFile(null);
       await refreshSelectedMaintenanceRequest();
-      setMaintenanceDetailMessage("File uploaded.");
+      setMaintenanceDetailMessage(t("mntFileUploaded"));
     } catch (err) {
       setMaintenanceDetailMessage(localizeError(err, t, "errUploadFile"));
     } finally {
@@ -271,6 +320,7 @@ export default function CustomerDashboard() {
                   { key: "inquiries" as Tab, labelKey: "myInquiries" as const, icon: MessageSquare, count: leads.length },
                   { key: "cars" as Tab, labelKey: "inventory" as const, icon: Car, count: myCars.length },
                   { key: "maintenance" as Tab, labelKey: "contact" as const, icon: Wrench, count: maintenanceRequests.length },
+                  { key: "messages" as Tab, labelKey: "chatTab" as const, icon: MessageSquare },
                   { key: "favorites" as Tab, labelKey: "myFavorites" as const, icon: Heart, count: favorites.length },
                   { key: "profile" as Tab, labelKey: "profile" as const, icon: Settings },
                 ]).map((item) => (
@@ -347,7 +397,7 @@ export default function CustomerDashboard() {
                           </div>
                           <Button onClick={() => openMaintenanceDialog(asset)} className="w-full bg-[#00D2FF] hover:bg-[#00D2FF]/80 text-[#0B0F19] font-semibold">
                             <Wrench className="w-4 h-4 mr-2" />
-                            Request Maintenance
+                            {t("mntRequestTitle")}
                           </Button>
                         </div>
                       </div>
@@ -359,13 +409,22 @@ export default function CustomerDashboard() {
 
             {activeTab === "maintenance" && (
               <div>
-                <h2 className="text-2xl font-bold text-white mb-6">Maintenance</h2>
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-6">
+                  <h2 className="text-2xl font-bold text-white">{t("mntTitle")}</h2>
+                  <Button
+                    onClick={() => openMaintenanceDialogForCar()}
+                    className="bg-[#00D2FF] hover:bg-[#00D2FF]/80 text-[#0B0F19] font-semibold"
+                  >
+                    <Wrench className="w-4 h-4 mr-2" />
+                    {t("mntNewRequest")}
+                  </Button>
+                </div>
                 {maintenanceRequests.length === 0 ? (
                   <div className="bg-[#121826] rounded-xl border border-white/10 p-12 text-center">
                     <Wrench className="w-12 h-12 text-white/20 mx-auto mb-4" />
-                    <p className="text-white/50 mb-4">No maintenance requests yet.</p>
-                    <Button onClick={() => setActiveTab("cars")} className="bg-[#00D2FF] hover:bg-[#00D2FF]/80 text-[#0B0F19] font-semibold">
-                      View My Cars
+                    <p className="text-white/50 mb-4">{t("mntNoRequests")}</p>
+                    <Button onClick={() => openMaintenanceDialogForCar()} className="bg-[#00D2FF] hover:bg-[#00D2FF]/80 text-[#0B0F19] font-semibold">
+                      {t("mntNewRequest")}
                     </Button>
                   </div>
                 ) : (
@@ -375,7 +434,7 @@ export default function CustomerDashboard() {
                         <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
                           <div>
                             <h3 className="text-white font-semibold">
-                              {request.car ? `${request.car.brand} ${request.car.model} ${request.car.year}` : "Drive X car"}
+                              {request.car ? `${request.car.brand} ${request.car.model} ${request.car.year}` : t("mntDriveXCar")}
                             </h3>
                             <p className="text-white/50 text-sm">{request.requestType.replaceAll("_", " ")} · {request.city}</p>
                             <p className="text-white/40 text-xs mt-1">{new Date(request.createdAt).toLocaleDateString()}</p>
@@ -387,7 +446,7 @@ export default function CustomerDashboard() {
                         <p className="text-white/60 text-sm mt-3">{request.notes}</p>
                         {request.quote && (
                           <div className="mt-3 rounded-lg border border-gold/20 bg-gold/10 p-3 text-sm text-white/80">
-                            Quote: {request.quote.amount.toLocaleString()} {request.quote.currency}
+                            {t("mntQuote")}: {request.quote.amount.toLocaleString()} {request.quote.currency}
                           </div>
                         )}
                         <div className="mt-4 flex flex-wrap gap-2">
@@ -397,7 +456,7 @@ export default function CustomerDashboard() {
                             onClick={() => openMaintenanceDetail(request.id)}
                             className="border-white/20 text-white/80 hover:bg-white/10"
                           >
-                            Details
+                            {t("mntDetails")}
                           </Button>
                           {request.status === "WAITING_CUSTOMER_APPROVAL" && (
                             <Button
@@ -408,7 +467,7 @@ export default function CustomerDashboard() {
                               }}
                               className="bg-green-500 hover:bg-green-600 text-white"
                             >
-                              Approve Quote
+                              {t("mntApproveQuote")}
                             </Button>
                           )}
                           {!["IN_PROGRESS", "COMPLETED", "CANCELLED", "REJECTED"].includes(request.status) && (
@@ -421,7 +480,7 @@ export default function CustomerDashboard() {
                               }}
                               className="border-red-500/30 text-red-400 hover:bg-red-500/10"
                             >
-                              Cancel
+                              {t("mntCancel")}
                             </Button>
                           )}
                         </div>
@@ -429,6 +488,16 @@ export default function CustomerDashboard() {
                     ))}
                   </div>
                 )}
+              </div>
+            )}
+
+            {activeTab === "messages" && (
+              <div>
+                <h2 className="text-2xl font-bold text-white mb-6">{t("chatTab")}</h2>
+                <ChatPanel
+                  mode="customer"
+                  initialThreadId={new URLSearchParams(location.search).get("thread") ?? undefined}
+                />
               </div>
             )}
 
@@ -633,12 +702,31 @@ export default function CustomerDashboard() {
       <Dialog open={maintenanceDialogOpen} onOpenChange={setMaintenanceDialogOpen}>
         <DialogContent className="bg-[#121826] border-white/10 text-white max-w-lg">
           <DialogHeader>
-            <DialogTitle>Request Maintenance</DialogTitle>
+            <DialogTitle>{t("mntRequestTitle")}</DialogTitle>
           </DialogHeader>
           <form onSubmit={handleMaintenanceSubmit} className="space-y-4">
-            {selectedAsset && (
+            {selectedAsset ? (
               <div className="rounded-lg border border-white/10 bg-white/5 p-3 text-sm text-white/70">
                 {selectedAsset.car.brand} {selectedAsset.car.model} {selectedAsset.car.year}
+              </div>
+            ) : (
+              <div className="space-y-1">
+                <label className="text-xs text-white/50">{t("mntSelectCar")}</label>
+                <Select
+                  value={maintenanceForm.carId}
+                  onValueChange={(value) => setMaintenanceForm({ ...maintenanceForm, carId: value })}
+                >
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder={t("mntSelectCar")} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#121826] border-white/10 max-h-64">
+                    {allCars.map((car) => (
+                      <SelectItem key={car.id} value={car.id}>
+                        {car.brand} {car.model} {car.year}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             )}
             {maintenanceMessage && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-400">{maintenanceMessage}</div>}
@@ -648,14 +736,37 @@ export default function CustomerDashboard() {
               </SelectTrigger>
               <SelectContent className="bg-[#121826] border-white/10">
                 {maintenanceTypes.map((type) => (
-                  <SelectItem key={type.value} value={type.value}>{type.label}</SelectItem>
+                  <SelectItem key={type.value} value={type.value}>{t(type.labelKey)}</SelectItem>
                 ))}
               </SelectContent>
             </Select>
+            {workshops.length > 0 && (
+              <div className="space-y-1">
+                <label className="text-xs text-white/50">{t("mntWorkshopOptional")}</label>
+                <Select
+                  value={maintenanceForm.preferredWorkshopId || "NONE"}
+                  onValueChange={(value) =>
+                    setMaintenanceForm({ ...maintenanceForm, preferredWorkshopId: value === "NONE" ? "" : value })
+                  }
+                >
+                  <SelectTrigger className="bg-white/5 border-white/10 text-white">
+                    <SelectValue placeholder={t("mntNoWorkshopPreference")} />
+                  </SelectTrigger>
+                  <SelectContent className="bg-[#121826] border-white/10 max-h-64">
+                    <SelectItem value="NONE">{t("mntNoWorkshopPreference")}</SelectItem>
+                    {workshops.map((shop) => (
+                      <SelectItem key={shop.id} value={shop.id}>
+                        {shop.name} · {shop.city}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
             <Input
               value={maintenanceForm.city}
               onChange={(e) => setMaintenanceForm({ ...maintenanceForm, city: e.target.value })}
-              placeholder="City / area"
+              placeholder={t("mntCityPlaceholder")}
               required
               className="bg-white/5 border-white/10 text-white"
             />
@@ -668,14 +779,14 @@ export default function CustomerDashboard() {
             <Input
               value={maintenanceForm.contactPhone}
               onChange={(e) => setMaintenanceForm({ ...maintenanceForm, contactPhone: e.target.value })}
-              placeholder="Contact phone"
+              placeholder={t("mntContactPhone")}
               required
               className="bg-white/5 border-white/10 text-white"
             />
             <Textarea
               value={maintenanceForm.notes}
               onChange={(e) => setMaintenanceForm({ ...maintenanceForm, notes: e.target.value })}
-              placeholder="Describe the issue or service needed"
+              placeholder={t("mntDescribe")}
               required
               className="bg-white/5 border-white/10 text-white min-h-28"
             />
@@ -685,11 +796,11 @@ export default function CustomerDashboard() {
                 checked={maintenanceForm.pickupNeeded}
                 onChange={(e) => setMaintenanceForm({ ...maintenanceForm, pickupNeeded: e.target.checked })}
               />
-              Pickup or delivery needed
+              {t("mntPickup")}
             </label>
             <Button type="submit" disabled={savingMaintenance} className="w-full bg-[#00D2FF] hover:bg-[#00D2FF]/80 text-[#0B0F19] font-semibold">
               {savingMaintenance && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Submit Request
+              {t("mntSubmitRequest")}
             </Button>
           </form>
         </DialogContent>
@@ -697,7 +808,7 @@ export default function CustomerDashboard() {
       <Dialog open={maintenanceDetailOpen} onOpenChange={setMaintenanceDetailOpen}>
         <DialogContent className="bg-[#121826] border-white/10 text-white max-w-2xl max-h-[85vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>Maintenance Details</DialogTitle>
+            <DialogTitle>{t("mntDetailsTitle")}</DialogTitle>
           </DialogHeader>
           {selectedMaintenanceRequest && (
             <div className="space-y-5">
@@ -707,7 +818,7 @@ export default function CustomerDashboard() {
                     <h3 className="text-white font-semibold">
                       {selectedMaintenanceRequest.car
                         ? `${selectedMaintenanceRequest.car.brand} ${selectedMaintenanceRequest.car.model} ${selectedMaintenanceRequest.car.year}`
-                        : "Drive X car"}
+                        : t("mntDriveXCar")}
                     </h3>
                     <p className="text-white/50 text-sm">
                       {selectedMaintenanceRequest.requestType.replaceAll("_", " ")} · {selectedMaintenanceRequest.city}
@@ -721,7 +832,7 @@ export default function CustomerDashboard() {
                 {selectedMaintenanceRequest.quote && (
                   <div className="mt-4 rounded-lg border border-gold/20 bg-gold/10 p-3">
                     <p className="text-white text-sm font-medium">
-                      Quote: {selectedMaintenanceRequest.quote.amount.toLocaleString()} {selectedMaintenanceRequest.quote.currency}
+                      {t("mntQuote")}: {selectedMaintenanceRequest.quote.amount.toLocaleString()} {selectedMaintenanceRequest.quote.currency}
                     </p>
                     {selectedMaintenanceRequest.status === "WAITING_CUSTOMER_APPROVAL" && (
                       <div className="flex flex-wrap gap-2 mt-3">
@@ -733,7 +844,7 @@ export default function CustomerDashboard() {
                           }}
                           className="bg-green-500 hover:bg-green-600 text-white"
                         >
-                          Approve Quote
+                          {t("mntApproveQuote")}
                         </Button>
                         <Button
                           size="sm"
@@ -744,7 +855,7 @@ export default function CustomerDashboard() {
                           }}
                           className="border-red-500/30 text-red-400 hover:bg-red-500/10"
                         >
-                          Reject Quote
+                          {t("mntRejectQuote")}
                         </Button>
                       </div>
                     )}
@@ -761,7 +872,7 @@ export default function CustomerDashboard() {
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
                 <h4 className="text-white font-semibold mb-3 flex items-center gap-2">
                   <Upload className="w-4 h-4 text-[#00D2FF]" />
-                  Attachments
+                  {t("mntAttachments")}
                 </h4>
                 <div className="flex flex-col sm:flex-row gap-2 mb-3">
                   <Input
@@ -776,7 +887,7 @@ export default function CustomerDashboard() {
                     onClick={handleMaintenanceFileUpload}
                     className="bg-[#00D2FF] hover:bg-[#00D2FF]/80 text-[#0B0F19] font-semibold"
                   >
-                    {isUploadingMaintenanceFile ? "Uploading..." : "Upload"}
+                    {isUploadingMaintenanceFile ? t("mntUploading") : t("mntUpload")}
                   </Button>
                 </div>
                 {selectedMaintenanceRequest.files && selectedMaintenanceRequest.files.length > 0 ? (
@@ -790,17 +901,17 @@ export default function CustomerDashboard() {
                         className="flex items-center gap-2 text-sm text-[#00D2FF] hover:underline"
                       >
                         <FileText className="w-4 h-4" />
-                        {file.fileType ?? "Attachment"} · {new Date(file.createdAt).toLocaleDateString()}
+                        {file.fileType ?? t("mntAttachment")} · {new Date(file.createdAt).toLocaleDateString()}
                       </a>
                     ))}
                   </div>
                 ) : (
-                  <p className="text-white/40 text-sm">No attachments yet.</p>
+                  <p className="text-white/40 text-sm">{t("mntNoAttachments")}</p>
                 )}
               </div>
 
               <div className="rounded-lg border border-white/10 bg-white/5 p-4">
-                <h4 className="text-white font-semibold mb-3">Timeline</h4>
+                <h4 className="text-white font-semibold mb-3">{t("mntTimeline")}</h4>
                 {selectedMaintenanceRequest.updates && selectedMaintenanceRequest.updates.length > 0 ? (
                   <div className="space-y-3">
                     {selectedMaintenanceRequest.updates.map((update) => (
@@ -814,7 +925,7 @@ export default function CustomerDashboard() {
                     ))}
                   </div>
                 ) : (
-                  <p className="text-white/40 text-sm">No updates yet.</p>
+                  <p className="text-white/40 text-sm">{t("mntNoUpdates")}</p>
                 )}
               </div>
             </div>
