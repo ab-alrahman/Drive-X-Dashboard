@@ -15,6 +15,7 @@ import { getCustomerAccessToken, getCustomerSessionProfile } from "@/lib/api";
 import {
   createMaintenanceRequest,
   getMaintenanceWorkshops,
+  getPublicCar,
   getPublicCars,
   requestCarInspection,
 } from "@/lib/public-api";
@@ -84,14 +85,20 @@ export default function RequestService() {
       return;
     }
     (async () => {
-      const [carsData, workshopsData] = await Promise.all([
+      const [carsData, workshopsData, pinnedCar] = await Promise.all([
         getPublicCars({ page: 1, limit: 200 }).catch(() => ({ items: [] as ApiCar[] })),
         getMaintenanceWorkshops().catch(() => [] as MaintenanceWorkshop[]),
+        carIdParam ? getPublicCar(carIdParam).catch(() => null) : Promise.resolve(null),
       ]);
-      setCars(carsData.items);
+      // Merge the deep-linked car in even if it is no longer in public inventory
+      // (e.g. already sold), so its details still show on this page.
+      const merged = pinnedCar
+        ? [pinnedCar, ...carsData.items.filter((car) => car.id !== pinnedCar.id)]
+        : carsData.items;
+      setCars(merged);
       setWorkshops(workshopsData);
     })();
-  }, [navigate]);
+  }, [navigate, carIdParam]);
 
   const selectedCar = cars.find((car) => car.id === carId);
 
@@ -158,12 +165,21 @@ export default function RequestService() {
               {mode === "inspection" ? t("rsInspectionSuccess") : t("rsRepairSuccess")}
             </p>
             <div className="flex flex-wrap gap-3 justify-center mt-6">
-              <Button
-                onClick={() => navigate("/my-dashboard?tab=maintenance")}
-                className="bg-gold hover:bg-gold-light text-dark font-bold"
-              >
-                {t("rsGoToRequests")}
-              </Button>
+              {mode === "repair" ? (
+                <Button
+                  onClick={() => navigate("/my-dashboard?tab=maintenance")}
+                  className="bg-gold hover:bg-gold-light text-dark font-bold"
+                >
+                  {t("rsGoToRequests")}
+                </Button>
+              ) : (
+                <Button
+                  onClick={() => navigate("/inventory")}
+                  className="bg-gold hover:bg-gold-light text-dark font-bold"
+                >
+                  {t("browseInventoryBtn")}
+                </Button>
+              )}
               <Button
                 variant="outline"
                 onClick={() => {
