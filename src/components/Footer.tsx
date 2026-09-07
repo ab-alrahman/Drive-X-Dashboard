@@ -97,7 +97,7 @@ export default function Footer() {
 
         <div className="border-t border-gold/20 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
           <p className="text-white/40 text-sm text-center md:text-start">
-            © {new Date().getFullYear()} Drive X. {t("allRightsReserved")}
+            © {currentYear} Drive X. {t("allRightsReserved")}
             <span className="mx-2 text-gold/40">·</span>
             {t("footerBuiltBy")}
           </p>
