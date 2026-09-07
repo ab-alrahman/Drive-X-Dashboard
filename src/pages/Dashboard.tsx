@@ -206,6 +206,16 @@ const emptyAccountForm = {
   vendorName: "",
 };
 
+type NotificationPreferenceKey = "inquiries" | "priceAlerts" | "systemUpdates";
+
+const NOTIFICATION_PREFERENCES_KEY = "drive_x_dashboard_notification_preferences";
+
+const defaultNotificationPreferences: Record<NotificationPreferenceKey, boolean> = {
+  inquiries: true,
+  priceAlerts: true,
+  systemUpdates: true,
+};
+
 const dashboardText = {
   en: {
     overview: "Overview",
@@ -492,6 +502,20 @@ export default function Dashboard() {
   const [reviewingComplaint, setReviewingComplaint] = useState<Complaint | null>(null);
   const [reviewNote, setReviewNote] = useState("");
   const [isReviewing, setIsReviewing] = useState(false);
+  const [notificationPreferences, setNotificationPreferences] = useState<Record<NotificationPreferenceKey, boolean>>(() => {
+    try {
+      return {
+        ...defaultNotificationPreferences,
+        ...JSON.parse(localStorage.getItem(NOTIFICATION_PREFERENCES_KEY) ?? "{}"),
+      };
+    } catch {
+      return defaultNotificationPreferences;
+    }
+  });
+
+  useEffect(() => {
+    localStorage.setItem(NOTIFICATION_PREFERENCES_KEY, JSON.stringify(notificationPreferences));
+  }, [notificationPreferences]);
 
   useEffect(() => {
     if (!getAccessToken()) {
@@ -1359,6 +1383,38 @@ export default function Dashboard() {
     { label: dl("Maintenance", "الصيانة"), value: maintenanceRequests.length, icon: Wrench },
     { label: dl("Complaints", "الشكاوى"), value: complaints.length, icon: ShieldAlert },
   ];
+  const notificationItems = [
+    {
+      key: "inquiries" as const,
+      label: dl("New Inquiries", "طلبات اهتمام جديدة"),
+      desc: dl("Get notified when a new inquiry is received", "تنبيه عند وصول طلب اهتمام جديد"),
+      count: leads.filter((lead) => lead.status === "NEW").length,
+      targetTab: "inquiries",
+    },
+    {
+      key: "priceAlerts" as const,
+      label: dl("Price Alerts", "تنبيهات الأسعار"),
+      desc: dl("Receive alerts when car prices change", "تنبيه عند تغيّر أسعار السيارات"),
+      count: 0,
+      targetTab: "cars",
+    },
+    {
+      key: "systemUpdates" as const,
+      label: dl("System Updates", "تحديثات النظام"),
+      desc: dl("Important system notifications", "تنبيهات مهمة من النظام"),
+      count:
+        maintenanceRequests.filter((request) => !["COMPLETED", "CANCELLED", "REJECTED"].includes(request.status)).length +
+        (isPlatformAdmin ? complaints.filter((complaint) => complaint.status === "OPEN").length : 0) +
+        (isPlatformAdmin ? vendors.filter((vendor) => Boolean(vendor.flaggedAt)).length : 0),
+      targetTab: isPlatformAdmin ? "vendors" : "maintenance",
+    },
+  ];
+  const enabledNotificationItems = notificationItems.filter((item) => notificationPreferences[item.key]);
+  const notificationCount = enabledNotificationItems.reduce((total, item) => total + item.count, 0);
+  const notificationTargetTab = enabledNotificationItems.find((item) => item.count > 0)?.targetTab ?? "settings";
+  const toggleNotificationPreference = (key: NotificationPreferenceKey) => {
+    setNotificationPreferences((current) => ({ ...current, [key]: !current[key] }));
+  };
 
   const sidebarItems = [
     { id: "overview", label: dt("overview"), icon: LayoutDashboard },
@@ -1448,13 +1504,20 @@ export default function Dashboard() {
                   />
                 </div>
                 <button
-                  onClick={() => setActiveTab("inquiries")}
+                  onClick={() => setActiveTab(notificationTargetTab)}
+                  title={
+                    notificationCount > 0
+                      ? dl(`${notificationCount} notifications`, `${notificationCount} تنبيهات`)
+                      : dl("No new notifications", "لا توجد تنبيهات جديدة")
+                  }
                   className="relative w-10 h-10 rounded-lg bg-dark-card border border-gold/20 flex items-center justify-center text-white/60 hover:text-gold transition-colors"
                 >
                   <Bell className="w-5 h-5" />
-                  <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full bg-gold text-dark text-[10px] font-bold flex items-center justify-center">
-                    3
-                  </span>
+                  {notificationCount > 0 && (
+                    <span className="absolute -top-1 -right-1 min-w-4 h-4 px-1 rounded-full bg-gold text-dark text-[10px] font-bold flex items-center justify-center">
+                      {notificationCount > 99 ? "99+" : notificationCount}
+                    </span>
+                  )}
                 </button>
               </div>
             </div>
@@ -2341,21 +2404,39 @@ export default function Dashboard() {
                 <div className="bg-dark-card border border-gold/20 rounded-xl p-6">
                   <h3 className="text-white font-bold text-lg mb-6">{dt("notificationPreferences")}</h3>
                   <div className="space-y-4">
-                    {[
-                      { label: "New Inquiries", desc: "Get notified when a new inquiry is received" },
-                      { label: "Price Alerts", desc: "Receive alerts when car prices change" },
-                      { label: "System Updates", desc: "Important system notifications" },
-                    ].map((pref) => (
-                      <div key={pref.label} className="flex items-center justify-between py-3 border-b border-gold/10">
-                        <div>
-                          <p className="text-white font-medium">{pref.label}</p>
-                          <p className="text-white/50 text-sm">{pref.desc}</p>
+                    {notificationItems.map((pref) => {
+                      const enabled = notificationPreferences[pref.key];
+                      return (
+                        <div key={pref.label} className="flex items-center justify-between py-3 border-b border-gold/10">
+                          <div>
+                            <div className="flex items-center gap-2">
+                              <p className="text-white font-medium">{pref.label}</p>
+                              {enabled && pref.count > 0 && (
+                                <span className="min-w-5 h-5 px-1.5 rounded-full bg-gold text-dark text-[11px] font-bold flex items-center justify-center">
+                                  {pref.count > 99 ? "99+" : pref.count}
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-white/50 text-sm">{pref.desc}</p>
+                          </div>
+                          <button
+                            type="button"
+                            role="switch"
+                            aria-checked={enabled}
+                            onClick={() => toggleNotificationPreference(pref.key)}
+                            className={`w-11 h-6 rounded-full relative transition-colors ${
+                              enabled ? "bg-gold/30" : "bg-white/10"
+                            }`}
+                          >
+                            <span
+                              className={`absolute top-1 w-4 h-4 rounded-full transition-all ${
+                                enabled ? "right-1 bg-gold" : "left-1 bg-white/40"
+                              }`}
+                            />
+                          </button>
                         </div>
-                        <div className="w-11 h-6 rounded-full bg-gold/20 relative cursor-pointer">
-                          <div className="absolute right-1 top-1 w-4 h-4 rounded-full bg-gold" />
-                        </div>
-                      </div>
-                    ))}
+                      );
+                    })}
                   </div>
                 </div>
               </div>
