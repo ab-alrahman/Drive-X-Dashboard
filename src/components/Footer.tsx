@@ -1,5 +1,5 @@
 import { Link } from "react-router";
-import { Car, MapPin, Phone, Mail, Instagram, Twitter, Facebook, Youtube, ArrowUp } from "lucide-react";
+import { Car, MapPin, GraduationCap, ArrowUp } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useI18n, type MessageKey } from "@/lib/i18n";
 
@@ -43,17 +43,6 @@ export default function Footer() {
               </div>
             </Link>
             <p className="text-white/60 text-sm leading-relaxed">{t("footerDescription")}</p>
-            <div className="flex items-center gap-3">
-              {[Instagram, Twitter, Facebook, Youtube].map((Icon, i) => (
-                <a
-                  key={i}
-                  href="#"
-                  className="w-9 h-9 rounded-full bg-gold/10 border border-gold/30 flex items-center justify-center text-gold hover:bg-gold hover:text-dark transition-all duration-300"
-                >
-                  <Icon className="w-4 h-4" />
-                </a>
-              ))}
-            </div>
           </div>
 
           <div>
@@ -93,29 +82,30 @@ export default function Footer() {
                 <MapPin className="w-5 h-5 text-gold mt-0.5 shrink-0" />
                 <span className="text-white/60 text-sm">{t("footerAddress")}</span>
               </li>
-              <li className="flex items-center gap-3">
-                <Phone className="w-5 h-5 text-gold shrink-0" />
-                <span className="text-white/60 text-sm">+966 11 234 5678</span>
+              <li className="flex items-start gap-3">
+                <GraduationCap className="w-5 h-5 text-gold mt-0.5 shrink-0" />
+                <span className="text-white/60 text-sm">{t("footerResponsibleParty")}</span>
               </li>
-              <li className="flex items-center gap-3">
-                <Mail className="w-5 h-5 text-gold shrink-0" />
-                <span className="text-white/60 text-sm">info@drivex.com</span>
+              <li>
+                <Link to="/contact" className="text-white/60 hover:text-gold transition-colors text-sm">
+                  {t("contactUs")}
+                </Link>
               </li>
             </ul>
           </div>
         </div>
 
         <div className="border-t border-gold/20 pt-8 flex flex-col md:flex-row items-center justify-between gap-4">
-          <p className="text-white/40 text-sm">© {currentYear} Drive X. {t("allRightsReserved")}</p>
-          <div className="flex items-center gap-6">
-            <span className="text-white/40 text-sm hover:text-gold cursor-pointer transition-colors">{t("privacyPolicy")}</span>
-            <span className="text-white/40 text-sm hover:text-gold cursor-pointer transition-colors">{t("termsOfService")}</span>
-          </div>
+          <p className="text-white/40 text-sm text-center md:text-start">
+            © {new Date().getFullYear()} Drive X. {t("allRightsReserved")}
+            <span className="mx-2 text-gold/40">·</span>
+            {t("footerBuiltBy")}
+          </p>
           <Button
             variant="outline"
             size="sm"
             onClick={scrollToTop}
-            className="border-gold/30 text-gold hover:bg-gold hover:text-dark"
+            className="border-gold/30 text-gold hover:bg-gold hover:text-dark shrink-0"
           >
             <ArrowUp className="w-4 h-4 mr-2" />
             {t("backToTop")}

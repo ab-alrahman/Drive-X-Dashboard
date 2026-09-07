@@ -18,7 +18,6 @@ import {
   ChevronLeft,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { stats } from "@/data/cars";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
 import { getFiltersMeta, getPublicCars } from "@/lib/public-api";
 import { useI18n } from "@/lib/i18n";
@@ -182,20 +181,6 @@ export default function Home() {
         <div className="absolute bottom-8 left-1/2 -translate-x-1/2 flex flex-col items-center gap-2 animate-bounce">
           <span className="text-white/40 text-xs tracking-wider">{t("scrollLabel")}</span>
           <div className="w-px h-8 bg-gradient-to-b from-gold to-transparent" />
-        </div>
-      </section>
-
-      {/* Stats Bar */}
-      <section className="relative z-20 -mt-16 mx-4 sm:mx-6 lg:mx-auto max-w-6xl">
-        <div className="bg-dark-card/90 backdrop-blur-xl border border-gold/20 rounded-2xl p-6 md:p-8 grid grid-cols-2 md:grid-cols-4 gap-6 shadow-2xl">
-          {stats.map((stat, i) => (
-            <div key={i} className="text-center">
-              <div className="text-2xl md:text-3xl font-bold text-gold mb-1">
-                {stat.value}
-              </div>
-              <div className="text-white/60 text-sm">{stat.label}</div>
-            </div>
-          ))}
         </div>
       </section>
 

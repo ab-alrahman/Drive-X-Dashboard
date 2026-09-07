@@ -37,7 +37,6 @@ import {
   getPublicCar,
   getPublicCars,
   removeFavoriteCar,
-  requestCarInspection,
 } from "@/lib/public-api";
 import type { AdminProfile, CustomerProfile, InspectionCase, PublicMaintenanceRecord } from "@/lib/api-types";
 import { submitCarComplaint } from "@/lib/vendors-api";
@@ -70,11 +69,6 @@ export default function CarDetail() {
   const [favoriteMessage, setFavoriteMessage] = useState("");
   const [inspectionCase, setInspectionCase] = useState<InspectionCase | null>(null);
   const [maintenanceHistory, setMaintenanceHistory] = useState<PublicMaintenanceRecord[]>([]);
-  const [showRequestInspection, setShowRequestInspection] = useState(false);
-  const [inspectionIntent, setInspectionIntent] = useState<"BUY" | "RENT">("BUY");
-  const [inspectionNotes, setInspectionNotes] = useState("");
-  const [isRequestingInspection, setIsRequestingInspection] = useState(false);
-  const [inspectionRequestMessage, setInspectionRequestMessage] = useState("");
   const [showComplaintDialog, setShowComplaintDialog] = useState(false);
   const [complaintText, setComplaintText] = useState("");
   const [complaintMessage, setComplaintMessage] = useState("");
@@ -174,29 +168,6 @@ export default function CarDetail() {
       .then((response) => setMaintenanceHistory(response.items))
       .catch(() => setMaintenanceHistory([]));
   }, [id]);
-
-  const handleRequestInspection = async () => {
-    if (!id) return;
-    if (!getCustomerAccessToken()) {
-      setInspectionRequestMessage(t("createAccountOrSignIn"));
-      navigate("/register");
-      return;
-    }
-    setIsRequestingInspection(true);
-    setInspectionRequestMessage("");
-    try {
-      await requestCarInspection(id, { intent: inspectionIntent, notes: inspectionNotes || undefined });
-      setInspectionRequestMessage("Your inspection request has been submitted. Drive X will follow up shortly.");
-      setShowRequestInspection(false);
-      setInspectionNotes("");
-      const refreshed = await getCarInspection(id);
-      setInspectionCase(refreshed);
-    } catch (error) {
-      setInspectionRequestMessage(localizeError(error, t, "errSubmitRequest"));
-    } finally {
-      setIsRequestingInspection(false);
-    }
-  };
 
   const toggleFavorite = async () => {
     if (!car) return;
@@ -577,21 +548,15 @@ export default function CarDetail() {
               </Button>
 
               <Button
-                variant="outline"
-                onClick={() => {
-                  if (!getCustomerAccessToken()) {
-                    navigate("/register");
-                    return;
-                  }
-                  navigate(`/my-dashboard?tab=maintenance&requestCarId=${car.id}`);
-                }}
-                className="mt-3 w-full border-gold/30 text-gold hover:bg-gold/10"
+                onClick={() => navigate(`/request-service?carId=${car.id}`)}
+                className="mt-3 w-full bg-gold hover:bg-gold-light text-dark font-semibold"
               >
                 <Wrench className="w-4 h-4 mr-2" />
-                {t("mntRequestTitle")}
+                {t("requestService")}
               </Button>
 
               <button
+                type="button"
                 onClick={openComplaintDialog}
                 className="mt-3 text-xs text-white/40 hover:text-white/70 transition-colors underline underline-offset-2"
               >
@@ -658,32 +623,7 @@ export default function CarDetail() {
                       </p>
                     </div>
                   </div>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => setShowRequestInspection(true)}
-                    className="border-gold/30 text-gold hover:bg-gold/10 shrink-0"
-                  >
-                    Request a Professional Inspection
-                  </Button>
-                  <Button
-                    size="sm"
-                    onClick={() => {
-                      if (!getCustomerAccessToken()) {
-                        navigate("/login");
-                        return;
-                      }
-                      navigate("/my-dashboard");
-                    }}
-                    className="bg-gold hover:bg-gold-light text-dark shrink-0"
-                  >
-                    Request Maintenance
-                  </Button>
                 </div>
-
-                {inspectionRequestMessage && (
-                  <p className="text-gold text-sm mb-4">{inspectionRequestMessage}</p>
-                )}
 
                 {badgeRound?.templateData && (
                   <p className="text-white/60 text-sm mb-4">{String(badgeRound.templateData.notes ?? "")}</p>
@@ -949,47 +889,6 @@ export default function CarDetail() {
                 <span className="text-white/60 text-xs">{t(item.name)}</span>
               </button>
             ))}
-          </div>
-        </DialogContent>
-      </Dialog>
-
-      <Dialog open={showRequestInspection} onOpenChange={setShowRequestInspection}>
-        <DialogContent className="bg-dark-card border-gold/30 max-w-md">
-          <DialogHeader>
-            <DialogTitle className="text-white text-xl">Request a Professional Inspection</DialogTitle>
-          </DialogHeader>
-          <div className="space-y-4">
-            <p className="text-white/60 text-sm">
-              A Drive X partner technician will visit and inspect this car, then publish a certified report.
-            </p>
-            <div className="flex gap-2">
-              {(["BUY", "RENT"] as const).map((option) => (
-                <Button
-                  key={option}
-                  type="button"
-                  variant={inspectionIntent === option ? "default" : "outline"}
-                  size="sm"
-                  onClick={() => setInspectionIntent(option)}
-                  className={inspectionIntent === option ? "bg-gold text-dark" : "border-gold/30 text-gold"}
-                >
-                  {option === "BUY" ? "I want to buy" : "I want to rent"}
-                </Button>
-              ))}
-            </div>
-            <Textarea
-              placeholder="Anything specific you'd like checked? (optional)"
-              value={inspectionNotes}
-              onChange={(event) => setInspectionNotes(event.target.value)}
-              className="bg-dark border-gold/20 text-white min-h-20"
-            />
-            {inspectionRequestMessage && <p className="text-gold text-sm">{inspectionRequestMessage}</p>}
-            <Button
-              onClick={handleRequestInspection}
-              disabled={isRequestingInspection}
-              className="w-full bg-gold hover:bg-gold-light text-dark font-bold"
-            >
-              {isRequestingInspection ? "Submitting..." : "Submit Request"}
-            </Button>
           </div>
         </DialogContent>
       </Dialog>
