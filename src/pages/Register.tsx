@@ -7,6 +7,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { registerCustomer } from "@/lib/public-api";
 import { useI18n } from "@/lib/i18n";
 import { localizeError } from "@/lib/errors";
+import { validatePersonName } from "@/lib/utils";
 
 export default function Register() {
   const navigate = useNavigate();
@@ -32,6 +33,12 @@ export default function Register() {
     e.preventDefault();
     setError("");
 
+    const nameError =
+      validatePersonName(formData.firstName) ?? validatePersonName(formData.lastName);
+    if (nameError) {
+      setError(t(nameError));
+      return;
+    }
     if (formData.password !== formData.confirmPassword) {
       setError(t("passwordsDoNotMatch"));
       return;

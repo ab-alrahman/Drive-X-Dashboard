@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
-import { Car, Heart, LayoutDashboard, Store, Compass, Phone, ShieldCheck } from "lucide-react";
+import { Car, Heart, LayoutDashboard, Store, Compass, Phone } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useI18n } from "@/lib/i18n";
@@ -61,13 +61,6 @@ export default function FirstVisitGuide() {
           action: "Sell Your Car",
           path: "/vendor-register",
         },
-        {
-          icon: ShieldCheck,
-          title: "إدارة منصة Drive X",
-          description: "هذا المسار مخصص لحسابات Platform Admin فقط، وليس للبائعين أو العملاء.",
-          action: "Admin Portal",
-          path: "/admin-login",
-        },
       ]
     : [
         {
@@ -97,13 +90,6 @@ export default function FirstVisitGuide() {
           description: "Use Sell Your Car to register your dealership and manage listings.",
           action: "Sell Your Car",
           path: "/vendor-register",
-        },
-        {
-          icon: ShieldCheck,
-          title: "Drive X platform admin",
-          description: "This path is only for Platform Admin accounts, not sellers or customers.",
-          action: "Admin Portal",
-          path: "/admin-login",
         },
       ];
 

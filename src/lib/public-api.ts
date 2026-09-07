@@ -14,6 +14,7 @@ import type {
   CustomerCarAsset,
   MaintenanceFile,
   MaintenanceRequest,
+  MaintenanceWorkshop,
   PasswordResetRequestResponse,
   PasswordResetResponse,
   PublicMaintenanceHistory,
@@ -145,6 +146,10 @@ export function requestCarInspection(carId: string, payload: { intent: "BUY" | "
 
 export function getMyCars() {
   return apiFetch<CustomerCarAsset[]>("/v1/public/me/cars", { auth: "customer" });
+}
+
+export function getMaintenanceWorkshops() {
+  return apiFetch<MaintenanceWorkshop[]>("/v1/public/maintenance/workshops", { auth: "customer" });
 }
 
 export function getMyMaintenanceRequests(params: { page?: number; limit?: number; status?: string } = {}) {

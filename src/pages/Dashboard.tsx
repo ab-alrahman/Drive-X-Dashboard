@@ -37,6 +37,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import ChatPanel from "@/components/ChatPanel";
 import {
   createAdminCar,
   createAdminDeal,
@@ -281,6 +282,20 @@ const dashboardText = {
     hiddenByPlatform: "Hidden by platform",
     restoreMarketplace: "Restore to marketplace",
     hideMarketplace: "Hide from marketplace",
+    details: "Details",
+    mtTriage: "Triage",
+    mtSendVendor: "Send Vendor",
+    mtAcknowledge: "Acknowledge",
+    mtAssign: "Assign",
+    mtSchedule: "Schedule",
+    mtStart: "Start",
+    mtComplete: "Complete",
+    mtReject: "Reject",
+    noMaintenanceRequests: "No maintenance requests yet.",
+    publicNote: "Public",
+    internalNote: "Internal",
+    attachment: "Attachment",
+    messagesTab: "Messages",
   },
   ar: {
     overview: "نظرة عامة",
@@ -357,6 +372,20 @@ const dashboardText = {
     hiddenByPlatform: "مخفية من المنصة",
     restoreMarketplace: "إعادتها إلى السوق",
     hideMarketplace: "إخفاؤها من السوق",
+    details: "التفاصيل",
+    mtTriage: "فرز",
+    mtSendVendor: "إرسال للبائع",
+    mtAcknowledge: "تأكيد الاستلام",
+    mtAssign: "إسناد",
+    mtSchedule: "جدولة",
+    mtStart: "بدء العمل",
+    mtComplete: "إكمال",
+    mtReject: "رفض",
+    noMaintenanceRequests: "لا توجد طلبات صيانة بعد.",
+    publicNote: "عام",
+    internalNote: "داخلي",
+    attachment: "مرفق",
+    messagesTab: "الرسائل",
   },
 } as const;
 
@@ -1338,6 +1367,7 @@ export default function Dashboard() {
     { id: "deals", label: dt("deals"), icon: Handshake },
     { id: "inspections", label: dt("inspections"), icon: ShieldCheck },
     { id: "maintenance", label: dt("maintenance"), icon: Wrench },
+    { id: "messages", label: dt("messagesTab"), icon: MessageSquare },
     { id: "favorites", label: dt("favorites"), icon: Heart },
     { id: "analytics", label: dt("analytics"), icon: TrendingUp },
     { id: "settings", label: dt("settings"), icon: Settings },
@@ -2031,7 +2061,7 @@ export default function Dashboard() {
                           return (
                             <tr key={request.id} className="border-b border-gold/5 hover:bg-gold/5 transition-colors align-top">
                               <td className="px-4 py-3">
-                                <p className="text-white font-medium text-sm">{request.customerName ?? "Customer"}</p>
+                                <p className="text-white font-medium text-sm">{request.customerName ?? dt("customer")}</p>
                                 <p className="text-white/50 text-xs">{request.car ? `${request.car.brand} ${request.car.model} ${request.car.year}` : request.carId}</p>
                                 <p className="text-white/40 text-xs mt-1">{request.city} · {new Date(request.createdAt).toLocaleDateString()}</p>
                               </td>
@@ -2058,7 +2088,7 @@ export default function Dashboard() {
                                     onClick={() => openMaintenanceDetail(request.id)}
                                     className="border-white/20 text-white/80 hover:bg-white/10"
                                   >
-                                    Details
+                                    {dt("details")}
                                   </Button>
                                   {isPlatformAdmin && request.status === "ADMIN_REVIEW" && (
                                     <Button
@@ -2069,7 +2099,7 @@ export default function Dashboard() {
                                       }}
                                       className="bg-gold hover:bg-gold-light text-dark"
                                     >
-                                      Send Vendor
+                                      {dt("mtSendVendor")}
                                     </Button>
                                   )}
                                   {isPlatformAdmin && request.status === "NEW" && (
@@ -2081,7 +2111,7 @@ export default function Dashboard() {
                                       }}
                                       className="bg-gold hover:bg-gold-light text-dark"
                                     >
-                                      Triage
+                                      {dt("mtTriage")}
                                     </Button>
                                   )}
                                   {canVendorAcknowledge && (
@@ -2093,7 +2123,7 @@ export default function Dashboard() {
                                       }}
                                       className="bg-gold hover:bg-gold-light text-dark"
                                     >
-                                      Acknowledge
+                                      {dt("mtAcknowledge")}
                                     </Button>
                                   )}
                                   {isPlatformAdmin && ["TRIAGED", "VENDOR_ACKNOWLEDGED"].includes(request.status) && firstActiveTechnician && (
@@ -2106,7 +2136,7 @@ export default function Dashboard() {
                                       }}
                                       className="border-gold/30 text-gold hover:bg-gold/10"
                                     >
-                                      Assign
+                                      {dt("mtAssign")}
                                     </Button>
                                   )}
                                   {isPlatformAdmin && ["ASSIGNED_TO_PARTNER", "VENDOR_ACKNOWLEDGED", "TRIAGED"].includes(request.status) && (
@@ -2120,7 +2150,7 @@ export default function Dashboard() {
                                       }}
                                       className="border-gold/30 text-gold hover:bg-gold/10"
                                     >
-                                      Schedule
+                                      {dt("mtSchedule")}
                                     </Button>
                                   )}
                                   {isPlatformAdmin && request.status === "SCHEDULED" && (
@@ -2133,7 +2163,7 @@ export default function Dashboard() {
                                       }}
                                       className="border-gold/30 text-gold hover:bg-gold/10"
                                     >
-                                      Start
+                                      {dt("mtStart")}
                                     </Button>
                                   )}
                                   {isPlatformAdmin && request.status === "IN_PROGRESS" && (
@@ -2149,7 +2179,7 @@ export default function Dashboard() {
                                       }}
                                       className="bg-green-500 hover:bg-green-600 text-white"
                                     >
-                                      Complete
+                                      {dt("mtComplete")}
                                     </Button>
                                   )}
                                   {isPlatformAdmin && !["COMPLETED", "CANCELLED", "REJECTED"].includes(request.status) && (
@@ -2162,7 +2192,7 @@ export default function Dashboard() {
                                       }}
                                       className="text-red-400 hover:bg-red-500/10"
                                     >
-                                      Reject
+                                      {dt("mtReject")}
                                     </Button>
                                   )}
                                 </div>
@@ -2173,7 +2203,7 @@ export default function Dashboard() {
                         {maintenanceRequests.length === 0 && (
                           <tr>
                             <td colSpan={5} className="px-4 py-8 text-center text-white/40 text-sm">
-                              No maintenance requests yet.
+                              {dt("noMaintenanceRequests")}
                             </td>
                           </tr>
                         )}
@@ -2181,6 +2211,18 @@ export default function Dashboard() {
                     </table>
                   </div>
                 </div>
+              </div>
+            )}
+
+            {activeTab === "messages" && (
+              <div className="space-y-6">
+                <div>
+                  <h3 className="text-white font-bold text-lg">{dt("messagesTab")}</h3>
+                  {isPlatformAdmin && (
+                    <p className="text-white/50 text-sm mt-1">{dl("Read-only oversight of every seller/customer conversation.", "اطّلاع فقط على كل محادثات البائعين والعملاء.")}</p>
+                  )}
+                </div>
+                <ChatPanel mode={isPlatformAdmin ? "admin" : "vendor"} />
               </div>
             )}
 
@@ -3440,6 +3482,11 @@ export default function Dashboard() {
                     <p className="text-white/40 text-xs mt-1">
                       {selectedMaintenanceRequest.requestType.replaceAll("_", " ")} · {selectedMaintenanceRequest.city}
                     </p>
+                    {selectedMaintenanceRequest.preferredPartnerName && (
+                      <p className="text-[#00D2FF] text-xs mt-1">
+                        {dl("Preferred workshop", "الورشة المفضّلة")}: {selectedMaintenanceRequest.preferredPartnerName}
+                      </p>
+                    )}
                   </div>
                   <span className="px-3 py-1 rounded-full bg-gold/10 text-gold text-xs font-medium">
                     {enumLabel(selectedMaintenanceRequest.status)}
@@ -3479,7 +3526,7 @@ export default function Dashboard() {
                       <div key={update.id} className="border-l border-gold/30 pl-3">
                         <p className="text-white/70 text-sm">
                           {update.statusTo ? update.statusTo.replaceAll("_", " ") : update.authorRole}
-                          {update.isPublic ? " · Public" : " · Internal"}
+                          {update.isPublic ? ` · ${dt("publicNote")}` : ` · ${dt("internalNote")}`}
                         </p>
                         {update.note && <p className="text-white/50 text-sm">{update.note}</p>}
                         <p className="text-white/30 text-xs">{new Date(update.createdAt).toLocaleString()}</p>
@@ -3528,7 +3575,7 @@ export default function Dashboard() {
                         rel="noreferrer"
                         className="block text-sm text-gold hover:underline"
                       >
-                        {file.fileType ?? "Attachment"} · {new Date(file.createdAt).toLocaleDateString()}
+                        {file.fileType ?? dt("attachment")} · {new Date(file.createdAt).toLocaleDateString()}
                       </a>
                     ))}
                   </div>

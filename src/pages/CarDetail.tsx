@@ -21,10 +21,12 @@ import {
   Award,
   MessageSquare,
   FileText,
+  Wrench,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { getAccessToken, getAdminSessionProfile, getCustomerAccessToken, getCustomerSessionProfile } from "@/lib/api";
 import { mapApiCarToView, mapApiCarsToView, type CarView } from "@/lib/car-mapper";
+import { startChatThread } from "@/lib/chat-api";
 import {
   addFavoriteCar,
   createLead,
@@ -552,6 +554,42 @@ export default function CarDetail() {
                   {t("sendInquiry")}
                 </Button>
               </div>
+
+              <Button
+                variant="outline"
+                disabled={isOwnSellerListing}
+                onClick={async () => {
+                  if (!getCustomerAccessToken()) {
+                    navigate("/register");
+                    return;
+                  }
+                  try {
+                    const thread = await startChatThread(car.id);
+                    navigate(`/my-dashboard?tab=messages&thread=${thread.id}`);
+                  } catch (err) {
+                    setSubmitError(localizeError(err, t, "errSubmitRequest"));
+                  }
+                }}
+                className="mt-3 w-full border-gold/30 text-gold hover:bg-gold/10"
+              >
+                <MessageSquare className="w-4 h-4 mr-2" />
+                {t("chatMessageSeller")}
+              </Button>
+
+              <Button
+                variant="outline"
+                onClick={() => {
+                  if (!getCustomerAccessToken()) {
+                    navigate("/register");
+                    return;
+                  }
+                  navigate(`/my-dashboard?tab=maintenance&requestCarId=${car.id}`);
+                }}
+                className="mt-3 w-full border-gold/30 text-gold hover:bg-gold/10"
+              >
+                <Wrench className="w-4 h-4 mr-2" />
+                {t("mntRequestTitle")}
+              </Button>
 
               <button
                 onClick={openComplaintDialog}

@@ -8,6 +8,7 @@ import { registerVendor } from "@/lib/vendors-api";
 import { getCurrentAdmin } from "@/lib/auth-api";
 import { useI18n } from "@/lib/i18n";
 import { localizeError } from "@/lib/errors";
+import { validatePersonName } from "@/lib/utils";
 
 export default function VendorRegister() {
   const navigate = useNavigate();
@@ -30,6 +31,11 @@ export default function VendorRegister() {
     e.preventDefault();
     setError("");
 
+    const nameError = validatePersonName(formData.ownerFullName);
+    if (nameError) {
+      setError(t(nameError));
+      return;
+    }
     if (formData.ownerPassword !== formData.confirmPassword) {
       setError(t("passwordsDoNotMatch"));
       return;
