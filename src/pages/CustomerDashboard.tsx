@@ -75,6 +75,7 @@ export default function CustomerDashboard() {
   const [maintenanceMessage, setMaintenanceMessage] = useState("");
   const [savingMaintenance, setSavingMaintenance] = useState(false);
   const [maintenanceFile, setMaintenanceFile] = useState<File | null>(null);
+  const [isUploadingMaintenanceFile, setIsUploadingMaintenanceFile] = useState(false);
   const [maintenanceDetailMessage, setMaintenanceDetailMessage] = useState("");
   const [maintenanceForm, setMaintenanceForm] = useState({
     requestType: "ROUTINE_SERVICE" as MaintenanceRequestType,
@@ -227,6 +228,7 @@ export default function CustomerDashboard() {
   const handleMaintenanceFileUpload = async () => {
     if (!selectedMaintenanceRequest || !maintenanceFile) return;
     setMaintenanceDetailMessage("");
+    setIsUploadingMaintenanceFile(true);
     try {
       await uploadMaintenanceRequestFile(selectedMaintenanceRequest.id, maintenanceFile);
       setMaintenanceFile(null);
@@ -234,6 +236,8 @@ export default function CustomerDashboard() {
       setMaintenanceDetailMessage("File uploaded.");
     } catch (err) {
       setMaintenanceDetailMessage(localizeError(err, t, "errUploadFile"));
+    } finally {
+      setIsUploadingMaintenanceFile(false);
     }
   };
 
@@ -768,11 +772,11 @@ export default function CustomerDashboard() {
                   />
                   <Button
                     type="button"
-                    disabled={!maintenanceFile}
+                    disabled={!maintenanceFile || isUploadingMaintenanceFile}
                     onClick={handleMaintenanceFileUpload}
                     className="bg-[#00D2FF] hover:bg-[#00D2FF]/80 text-[#0B0F19] font-semibold"
                   >
-                    Upload
+                    {isUploadingMaintenanceFile ? "Uploading..." : "Upload"}
                   </Button>
                 </div>
                 {selectedMaintenanceRequest.files && selectedMaintenanceRequest.files.length > 0 ? (
@@ -780,7 +784,7 @@ export default function CustomerDashboard() {
                     {selectedMaintenanceRequest.files.map((file) => (
                       <a
                         key={file.id}
-                        href={file.fileUrl}
+                        href={resolveAssetUrl(file.fileUrl)}
                         target="_blank"
                         rel="noreferrer"
                         className="flex items-center gap-2 text-sm text-[#00D2FF] hover:underline"

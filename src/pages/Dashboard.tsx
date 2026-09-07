@@ -2,6 +2,8 @@ import { useCallback, useEffect, useState, type KeyboardEvent } from "react";
 import { useNavigate, Link } from "react-router";
 import {
   LayoutDashboard,
+  Users,
+  UserPlus,
   Car,
   DollarSign,
   TrendingUp,
@@ -28,6 +30,8 @@ import {
   Flag,
   Eye,
   EyeOff,
+  Image,
+  Upload,
   X,
   Wrench,
 } from "lucide-react";
@@ -37,6 +41,7 @@ import {
   createAdminCar,
   createAdminDeal,
   deleteAdminCar,
+  deleteAdminCarImage,
   deleteAdminDeal,
   getAdminCars,
   getAdminDashboardSummary,
@@ -51,8 +56,9 @@ import {
   updateMaintenanceRequestStatus,
   updateAdminCar,
   updateAdminLead,
+  uploadAdminCarImage,
 } from "@/lib/admin-api";
-import { clearAuthTokens, getAccessToken, getAdminSessionProfile } from "@/lib/api";
+import { clearAuthTokens, getAccessToken, getAdminSessionProfile, resolveAssetUrl } from "@/lib/api";
 import { getCurrentAdmin, logoutAdmin, updateAdminProfile } from "@/lib/auth-api";
 import { mapApiCarsToView, type CarView } from "@/lib/car-mapper";
 import type {
@@ -105,6 +111,12 @@ import {
 } from "@/components/ui/select";
 import { useI18n } from "@/lib/i18n";
 import { localizeError } from "@/lib/errors";
+import {
+  createPlatformAccount,
+  getPlatformAccounts,
+  type PlatformAccount,
+  type PlatformAccountType,
+} from "@/lib/platform-admin-api";
 
 const emptyReportFinding = { description: "", severity: "MINOR" as InspectionFindingSeverity, costAmount: "" };
 
@@ -184,6 +196,15 @@ const emptyDealForm = {
   notes: "",
 };
 
+const emptyAccountForm = {
+  type: "CUSTOMER" as PlatformAccountType,
+  fullName: "",
+  email: "",
+  phone: "",
+  password: "",
+  vendorName: "",
+};
+
 const dashboardText = {
   en: {
     overview: "Overview",
@@ -196,6 +217,9 @@ const dashboardText = {
     analytics: "Analytics",
     settings: "Settings",
     marketplaceOversight: "Marketplace Oversight",
+    accounts: "Accounts",
+    createAccount: "Create Account",
+    accountType: "Account Type",
     adminUser: "Admin User",
     admin: "Admin",
     logout: "Logout",
@@ -269,6 +293,9 @@ const dashboardText = {
     analytics: "التحليلات",
     settings: "الإعدادات",
     marketplaceOversight: "إشراف المنصة",
+    accounts: "الحسابات",
+    createAccount: "إنشاء حساب",
+    accountType: "نوع الحساب",
     adminUser: "مدير النظام",
     admin: "المدير",
     logout: "تسجيل الخروج",
@@ -398,6 +425,10 @@ export default function Dashboard() {
   const [carForm, setCarForm] = useState(emptyCarForm);
   const [isSavingCar, setIsSavingCar] = useState(false);
   const [carSearch, setCarSearch] = useState("");
+  const [imageDialogCarId, setImageDialogCarId] = useState<string | null>(null);
+  const [carImageFile, setCarImageFile] = useState<File | null>(null);
+  const [carImageIsPrimary, setCarImageIsPrimary] = useState(false);
+  const [isUploadingCarImage, setIsUploadingCarImage] = useState(false);
   const [profileNameInput, setProfileNameInput] = useState("");
   const [isSavingProfile, setIsSavingProfile] = useState(false);
   const [dealDialogOpen, setDealDialogOpen] = useState(false);
@@ -423,6 +454,10 @@ export default function Dashboard() {
   const [technicianForm, setTechnicianForm] = useState(emptyTechnicianForm);
   const [isSavingTechnician, setIsSavingTechnician] = useState(false);
   const [vendors, setVendors] = useState<Vendor[]>([]);
+  const [platformAccounts, setPlatformAccounts] = useState<PlatformAccount[]>([]);
+  const [accountDialogOpen, setAccountDialogOpen] = useState(false);
+  const [accountForm, setAccountForm] = useState(emptyAccountForm);
+  const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [complaints, setComplaints] = useState<Complaint[]>([]);
   const [complaintDialogOpen, setComplaintDialogOpen] = useState(false);
   const [reviewingComplaint, setReviewingComplaint] = useState<Complaint | null>(null);
@@ -479,9 +514,9 @@ export default function Dashboard() {
 
     const [summary, carsResponse, leadsResponse, dealsResponse, techniciansResponse, maintenanceResponse] = await Promise.all([
       getAdminDashboardSummary(),
-      getAdminCars({ page: 1, limit: 20 }),
-      getAdminLeads({ page: 1, limit: 20 }),
-      getAdminDeals({ page: 1, limit: 20 }),
+      getAdminCars({ page: 1, limit: 100 }),
+      getAdminLeads({ page: 1, limit: 100 }),
+      getAdminDeals({ page: 1, limit: 100 }),
       getTechnicians(),
       getAdminMaintenanceRequests({ page: 1, limit: 50 }),
     ]);
@@ -581,12 +616,14 @@ export default function Dashboard() {
 
   const refreshPlatformData = useCallback(async () => {
     if (!isPlatformAdmin) return;
-    const [vendorList, complaintsResponse] = await Promise.all([
+    const [vendorList, complaintsResponse, accountsResponse] = await Promise.all([
       getPlatformVendors(),
       getPlatformComplaints({ page: 1, limit: 50 }),
+      getPlatformAccounts().catch(() => []),
     ]);
     setVendors(vendorList);
     setComplaints(complaintsResponse.items);
+    setPlatformAccounts(accountsResponse);
   }, [isPlatformAdmin]);
 
   useEffect(() => {
@@ -633,6 +670,61 @@ export default function Dashboard() {
       description: car.description ?? "",
     });
     setCarDialogOpen(true);
+  };
+
+  const openCarImagesDialog = (carId: string) => {
+    setImageDialogCarId(carId);
+    setCarImageFile(null);
+    setCarImageIsPrimary(false);
+  };
+
+  const selectedImageCar = adminCars.find((car) => car.id === imageDialogCarId);
+
+  const handleCarImageUpload = async () => {
+    if (!imageDialogCarId || !carImageFile) return;
+    if (!carImageFile.type.startsWith("image/")) {
+      setDashboardError("Choose a valid image file.");
+      return;
+    }
+    if (carImageFile.size > 5 * 1024 * 1024) {
+      setDashboardError(t("errImageTooLarge"));
+      return;
+    }
+
+    setIsUploadingCarImage(true);
+    setDashboardError("");
+    setActionMessage("");
+    try {
+      const selectedCarImages = selectedImageCar?.images ?? [];
+      await uploadAdminCarImage(imageDialogCarId, carImageFile, {
+        isPrimary: carImageIsPrimary || selectedCarImages.length === 0,
+        position: selectedCarImages.length,
+      });
+      setCarImageFile(null);
+      setCarImageIsPrimary(false);
+      setActionMessage(dl("Car image uploaded.", "تم رفع صورة السيارة."));
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(localizeError(error, t, "errUploadFile"));
+    } finally {
+      setIsUploadingCarImage(false);
+    }
+  };
+
+  const handleDeleteCarImage = async (imageId?: string) => {
+    if (!imageDialogCarId || !imageId) return;
+    setIsUploadingCarImage(true);
+    setDashboardError("");
+    setActionMessage("");
+    try {
+      await deleteAdminCarImage(imageDialogCarId, imageId);
+      setActionMessage(dl("Car image deleted.", "تم حذف صورة السيارة."));
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(localizeError(error, t, "errDeleteCar"));
+    } finally {
+      setIsUploadingCarImage(false);
+    }
   };
 
   const carPayloadFromForm = (): CarPayload => {
@@ -794,6 +886,49 @@ export default function Dashboard() {
       await refreshDashboardData();
     } catch (error) {
       setDashboardError(localizeError(error, t, "errDeleteDeal"));
+    }
+  };
+
+  const openCreateAccount = (type: PlatformAccountType = "CUSTOMER") => {
+    setAccountForm({ ...emptyAccountForm, type });
+    setAccountDialogOpen(true);
+  };
+
+  const handleSaveAccount = async () => {
+    if (!accountForm.fullName.trim() || !accountForm.email.trim() || !accountForm.password.trim()) {
+      setDashboardError(dl("Name, email, and password are required.", "الاسم والبريد الإلكتروني وكلمة المرور مطلوبة."));
+      return;
+    }
+    if (accountForm.type === "SELLER" && !accountForm.vendorName.trim()) {
+      setDashboardError(dl("Dealership name is required for seller accounts.", "اسم المعرض مطلوب لحسابات البائعين."));
+      return;
+    }
+
+    setIsSavingAccount(true);
+    setDashboardError("");
+    setActionMessage("");
+    try {
+      const account = await createPlatformAccount({
+        type: accountForm.type,
+        fullName: accountForm.fullName.trim(),
+        email: accountForm.email.trim(),
+        phone: accountForm.phone.trim() || undefined,
+        password: accountForm.password,
+        vendorName: accountForm.vendorName.trim() || undefined,
+      });
+      setPlatformAccounts((accounts) => [account, ...accounts.filter((item) => item.id !== account.id)]);
+      setAccountDialogOpen(false);
+      setActionMessage(
+        accountForm.type === "SELLER"
+          ? dl("Seller account created.", "تم إنشاء حساب البائع.")
+          : dl("Customer account created.", "تم إنشاء حساب العميل.")
+      );
+      await refreshPlatformData();
+      await refreshDashboardData();
+    } catch (error) {
+      setDashboardError(localizeError(error, t, "couldNotSendRequest"));
+    } finally {
+      setIsSavingAccount(false);
     }
   };
 
@@ -1173,6 +1308,28 @@ export default function Dashboard() {
       date: new Date(lead.createdAt).toLocaleDateString(),
     };
   });
+  const accountRows = [
+    ...platformAccounts,
+    ...vendors
+      .filter((vendor) => !platformAccounts.some((account) => account.type === "SELLER" && account.id === vendor.id))
+      .map((vendor) => ({
+        id: vendor.id,
+        type: "SELLER" as const,
+        email: "-",
+        fullName: vendor.name,
+        vendorName: vendor.name,
+        status: vendor.status,
+        createdAt: vendor.createdAt,
+      })),
+  ];
+  const platformActivity = [
+    { label: dl("Listings", "الإعلانات"), value: dashboardCars.length, icon: Car },
+    { label: dl("Inquiries", "طلبات الاهتمام"), value: leads.length, icon: MessageSquare },
+    { label: dl("Deals", "الصفقات"), value: deals.length, icon: Handshake },
+    { label: dl("Sellers", "البائعون"), value: vendors.length, icon: Users },
+    { label: dl("Maintenance", "الصيانة"), value: maintenanceRequests.length, icon: Wrench },
+    { label: dl("Complaints", "الشكاوى"), value: complaints.length, icon: ShieldAlert },
+  ];
 
   const sidebarItems = [
     { id: "overview", label: dt("overview"), icon: LayoutDashboard },
@@ -1185,7 +1342,10 @@ export default function Dashboard() {
     { id: "analytics", label: dt("analytics"), icon: TrendingUp },
     { id: "settings", label: dt("settings"), icon: Settings },
     ...(isPlatformAdmin
-      ? [{ id: "vendors", label: dt("marketplaceOversight"), icon: ShieldAlert }]
+      ? [
+          { id: "accounts", label: dt("accounts"), icon: Users },
+          { id: "vendors", label: dt("marketplaceOversight"), icon: ShieldAlert },
+        ]
       : []),
   ];
 
@@ -1512,6 +1672,15 @@ export default function Dashboard() {
                                   className="text-gold hover:bg-gold/10 h-8 w-8 p-0"
                                 >
                                   <ShieldCheck className="w-4 h-4" />
+                                </Button>
+                                <Button
+                                  variant="ghost"
+                                  size="sm"
+                                  onClick={() => openCarImagesDialog(car.id)}
+                                  title={dl("Manage images", "إدارة الصور")}
+                                  className="text-gold hover:bg-gold/10 h-8 w-8 p-0"
+                                >
+                                  <Image className="w-4 h-4" />
                                 </Button>
                                 <Button
                                   variant="ghost"
@@ -2150,6 +2319,147 @@ export default function Dashboard() {
               </div>
             )}
 
+            {/* Accounts Tab (Platform Admin only) */}
+            {activeTab === "accounts" && isPlatformAdmin && (
+              <div className="space-y-8">
+                <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+                  <div>
+                    <h3 className="text-white font-bold text-lg">{dt("accounts")}</h3>
+                    <p className="text-white/50 text-sm mt-1">
+                      {dl(
+                        "Create customer and seller accounts, then monitor platform activity from one admin view.",
+                        "أنشئ حسابات العملاء والبائعين وراقب نشاط المنصة من مكان واحد."
+                      )}
+                    </p>
+                  </div>
+                  <div className="flex flex-col sm:flex-row gap-2">
+                    <Button onClick={() => openCreateAccount("CUSTOMER")} className="bg-gold hover:bg-gold-light text-dark">
+                      <UserPlus className="w-4 h-4 mr-2" />
+                      {dl("New Customer", "عميل جديد")}
+                    </Button>
+                    <Button
+                      variant="outline"
+                      onClick={() => openCreateAccount("SELLER")}
+                      className="border-gold/30 text-gold hover:bg-gold/10"
+                    >
+                      <Users className="w-4 h-4 mr-2" />
+                      {dl("New Seller", "بائع جديد")}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+                  {platformActivity.map((item) => (
+                    <div key={item.label} className="bg-dark-card border border-gold/10 rounded-xl p-5">
+                      <div className="flex items-center justify-between mb-3">
+                        <item.icon className="w-5 h-5 text-gold" />
+                        <span className="text-white/40 text-xs uppercase">Live</span>
+                      </div>
+                      <p className="text-2xl font-bold text-white">{item.value}</p>
+                      <p className="text-white/50 text-sm">{item.label}</p>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+                  <div className="bg-dark-card border border-gold/20 rounded-xl overflow-hidden">
+                    <div className="flex items-center justify-between p-5 border-b border-gold/10">
+                      <div>
+                        <h4 className="text-white font-semibold">{dl("Account Directory", "دليل الحسابات")}</h4>
+                        <p className="text-white/40 text-xs mt-1">
+                          {dl("Admin endpoint accounts plus registered sellers.", "حسابات الإدارة مع البائعين المسجلين.")}
+                        </p>
+                      </div>
+                      <span className="text-xs px-2 py-1 rounded-full bg-gold/10 text-gold">
+                        {accountRows.length}
+                      </span>
+                    </div>
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gold/10">
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("name")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("accountType")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("email")}</th>
+                            <th className="text-left text-white/50 text-xs font-medium px-4 py-3 uppercase">{dt("status")}</th>
+                          </tr>
+                        </thead>
+                        <tbody>
+                          {accountRows.map((account) => (
+                            <tr key={`${account.type}-${account.id}`} className="border-b border-gold/5 hover:bg-gold/5 transition-colors">
+                              <td className="px-4 py-3">
+                                <p className="text-white text-sm font-medium">{account.vendorName || account.fullName}</p>
+                                {account.phone && <p className="text-white/40 text-xs">{account.phone}</p>}
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className="text-xs px-2 py-1 rounded-full bg-gold/10 text-gold">
+                                  {account.type === "SELLER" ? dl("Seller", "بائع") : dl("Customer", "عميل")}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{account.email}</td>
+                              <td className="px-4 py-3 text-white/60 text-sm">{account.status ?? dl("Active", "نشط")}</td>
+                            </tr>
+                          ))}
+                          {accountRows.length === 0 && (
+                            <tr>
+                              <td colSpan={4} className="px-4 py-8 text-center text-white/40 text-sm">
+                                {dl("No accounts loaded yet.", "لم يتم تحميل أي حسابات بعد.")}
+                              </td>
+                            </tr>
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+
+                  <div className="bg-dark-card border border-gold/20 rounded-xl p-5">
+                    <h4 className="text-white font-semibold mb-4">{dl("Latest Platform Activity", "آخر نشاط في المنصة")}</h4>
+                    <div className="space-y-3">
+                      {[
+                        ...deals.slice(0, 5).map((deal) => ({
+                          id: `deal-${deal.id}`,
+                          title: dl("Deal closed", "تم إغلاق صفقة"),
+                          detail: `${deal.finalPrice.amount.toLocaleString()} ${deal.finalPrice.currency}`,
+                          date: deal.createdAt,
+                          icon: Handshake,
+                        })),
+                        ...leads.slice(0, 5).map((lead) => ({
+                          id: `lead-${lead.id}`,
+                          title: dl("New inquiry", "طلب اهتمام جديد"),
+                          detail: lead.fullName,
+                          date: lead.createdAt,
+                          icon: MessageSquare,
+                        })),
+                        ...adminCars.slice(0, 5).map((car) => ({
+                          id: `car-${car.id}`,
+                          title: dl("Listing added", "تمت إضافة إعلان"),
+                          detail: `${car.brand} ${car.model}`,
+                          date: car.createdAt,
+                          icon: Car,
+                        })),
+                      ]
+                        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                        .slice(0, 10)
+                        .map((activity) => (
+                          <div key={activity.id} className="flex items-start gap-3 rounded-lg bg-dark/70 border border-gold/10 p-3">
+                            <div className="w-8 h-8 rounded-lg bg-gold/10 flex items-center justify-center shrink-0">
+                              <activity.icon className="w-4 h-4 text-gold" />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-white text-sm font-medium">{activity.title}</p>
+                              <p className="text-white/50 text-xs truncate">{activity.detail}</p>
+                            </div>
+                            <span className="ml-auto text-white/30 text-xs shrink-0">
+                              {new Date(activity.date).toLocaleDateString()}
+                            </span>
+                          </div>
+                        ))}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
             {/* Marketplace Oversight Tab (Platform Admin only) */}
             {activeTab === "vendors" && (
               <div className="space-y-8">
@@ -2539,6 +2849,184 @@ export default function Dashboard() {
         </DialogContent>
       </Dialog>
 
+      <Dialog open={Boolean(imageDialogCarId)} onOpenChange={(open) => !open && setImageDialogCarId(null)}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-2xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">
+              {dl("Car Images", "صور السيارة")}
+              {selectedImageCar && (
+                <span className="text-white/40 font-normal"> - {selectedImageCar.brand} {selectedImageCar.model}</span>
+              )}
+            </DialogTitle>
+          </DialogHeader>
+
+          <div className="space-y-5">
+            <div className="rounded-lg border border-gold/20 bg-dark/50 p-4">
+              <div className="flex flex-col sm:flex-row gap-3">
+                <Input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp"
+                  onChange={(event) => setCarImageFile(event.target.files?.[0] ?? null)}
+                  className="bg-dark border-gold/20 text-white"
+                />
+                <Button
+                  type="button"
+                  onClick={handleCarImageUpload}
+                  disabled={!carImageFile || isUploadingCarImage}
+                  className="bg-gold hover:bg-gold-light text-dark font-bold"
+                >
+                  <Upload className="w-4 h-4 mr-2" />
+                  {isUploadingCarImage ? dl("Uploading...", "جاري الرفع...") : dl("Upload Image", "رفع الصورة")}
+                </Button>
+              </div>
+              <label className="mt-3 flex items-center gap-2 text-white/60 text-sm">
+                <input
+                  type="checkbox"
+                  checked={carImageIsPrimary}
+                  onChange={(event) => setCarImageIsPrimary(event.target.checked)}
+                  className="accent-gold"
+                />
+                {dl("Set as primary image", "تعيين كصورة رئيسية")}
+              </label>
+              <p className="text-white/35 text-xs mt-2">
+                {dl("Supported formats: JPG, PNG, WEBP. Maximum size: 5MB.", "الصيغ المدعومة: JPG و PNG و WEBP. الحجم الأقصى: 5MB.")}
+              </p>
+            </div>
+
+            {selectedImageCar?.images && selectedImageCar.images.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                {selectedImageCar.images
+                  .slice()
+                  .sort((a, b) => Number(b.isPrimary) - Number(a.isPrimary) || (a.position ?? 0) - (b.position ?? 0))
+                  .map((image) => {
+                    const imageUrl = resolveAssetUrl(image.url ?? image.imageUrl);
+                    return (
+                      <div key={image.id ?? imageUrl} className="rounded-lg border border-gold/20 bg-dark overflow-hidden">
+                        <div className="aspect-[4/3] bg-dark-card">
+                          {imageUrl ? (
+                            <img src={imageUrl} alt="" className="w-full h-full object-cover" />
+                          ) : (
+                            <div className="h-full flex items-center justify-center text-white/30">
+                              <Image className="w-8 h-8" />
+                            </div>
+                          )}
+                        </div>
+                        <div className="flex items-center justify-between gap-2 p-2">
+                          <span className={image.isPrimary ? "text-gold text-xs" : "text-white/40 text-xs"}>
+                            {image.isPrimary ? dl("Primary", "رئيسية") : dl("Gallery", "معرض")}
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            disabled={!image.id || isUploadingCarImage}
+                            onClick={() => handleDeleteCarImage(image.id)}
+                            className="h-7 px-2 text-red-400 hover:bg-red-500/10"
+                          >
+                            {dl("Delete", "حذف")}
+                          </Button>
+                        </div>
+                      </div>
+                    );
+                  })}
+              </div>
+            ) : (
+              <div className="rounded-lg border border-gold/10 bg-dark/50 p-8 text-center">
+                <Image className="w-10 h-10 text-gold mx-auto mb-3" />
+                <p className="text-white/60 text-sm">{dl("No images uploaded for this car yet.", "لم يتم رفع صور لهذه السيارة بعد.")}</p>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={accountDialogOpen} onOpenChange={setAccountDialogOpen}>
+        <DialogContent className="bg-dark-card border-gold/30 max-w-xl">
+          <DialogHeader>
+            <DialogTitle className="text-white text-xl">{dt("createAccount")}</DialogTitle>
+          </DialogHeader>
+
+          <div className="grid grid-cols-1 gap-4">
+            <div>
+              <label className="text-white/60 text-sm mb-2 block">{dt("accountType")}</label>
+              <Select
+                value={accountForm.type}
+                onValueChange={(value) => setAccountForm({ ...accountForm, type: value as PlatformAccountType })}
+              >
+                <SelectTrigger className="bg-dark border-gold/20 text-white">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent className="bg-dark-card border-gold/20">
+                  <SelectItem value="CUSTOMER">{dl("Customer", "عميل")}</SelectItem>
+                  <SelectItem value="SELLER">{dl("Seller", "بائع")}</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {accountForm.type === "SELLER" && (
+              <Input
+                placeholder={dl("Dealership name", "اسم المعرض")}
+                value={accountForm.vendorName}
+                onChange={(event) => setAccountForm({ ...accountForm, vendorName: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+            )}
+
+            <Input
+              placeholder={dl("Full name", "الاسم الكامل")}
+              value={accountForm.fullName}
+              onChange={(event) => setAccountForm({ ...accountForm, fullName: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <Input
+                type="email"
+                placeholder={dt("email")}
+                value={accountForm.email}
+                onChange={(event) => setAccountForm({ ...accountForm, email: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+              <Input
+                placeholder={dl("Phone", "الهاتف")}
+                value={accountForm.phone}
+                onChange={(event) => setAccountForm({ ...accountForm, phone: event.target.value })}
+                className="bg-dark border-gold/20 text-white"
+              />
+            </div>
+            <Input
+              type="password"
+              placeholder={dl("Temporary password", "كلمة مرور مؤقتة")}
+              value={accountForm.password}
+              onChange={(event) => setAccountForm({ ...accountForm, password: event.target.value })}
+              className="bg-dark border-gold/20 text-white"
+            />
+            <p className="text-white/40 text-xs">
+              {dl(
+                "Share this temporary password with the account owner. They can reset it later from the login page.",
+                "أرسل كلمة المرور المؤقتة لصاحب الحساب، ويمكنه تغييرها لاحقاً من صفحة تسجيل الدخول."
+              )}
+            </p>
+          </div>
+
+          <div className="flex justify-end gap-3 pt-4">
+            <Button
+              variant="outline"
+              onClick={() => setAccountDialogOpen(false)}
+              className="border-gold/30 text-gold hover:bg-gold/10"
+            >
+              {dl("Cancel", "إلغاء")}
+            </Button>
+            <Button
+              onClick={handleSaveAccount}
+              disabled={isSavingAccount}
+              className="bg-gold hover:bg-gold-light text-dark font-bold"
+            >
+              {isSavingAccount ? dl("Creating...", "جاري الإنشاء...") : dt("createAccount")}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
+
       <Dialog open={dealDialogOpen} onOpenChange={setDealDialogOpen}>
         <DialogContent className="bg-dark-card border-gold/30 max-w-xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
@@ -2656,7 +3144,7 @@ export default function Dashboard() {
                       )}
                       {round.externalFileUrl && (
                         <a
-                          href={round.externalFileUrl}
+                          href={resolveAssetUrl(round.externalFileUrl)}
                           target="_blank"
                           rel="noreferrer"
                           className="text-gold text-xs mt-2 inline-block underline"
