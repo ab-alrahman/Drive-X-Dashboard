@@ -1,5 +1,5 @@
 import { apiFetch } from "./api";
-import type { AdminRole, CustomerAuthResponse, CustomerProfile, Vendor } from "./api-types";
+import type { AdminRole, CustomerAuthResponse, Vendor } from "./api-types";
 
 export type PlatformAccountType = "CUSTOMER" | "SELLER";
 

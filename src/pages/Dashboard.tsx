@@ -1308,11 +1308,11 @@ export default function Dashboard() {
       date: new Date(lead.createdAt).toLocaleDateString(),
     };
   });
-  const accountRows = [
+  const accountRows: PlatformAccount[] = [
     ...platformAccounts,
     ...vendors
       .filter((vendor) => !platformAccounts.some((account) => account.type === "SELLER" && account.id === vendor.id))
-      .map((vendor) => ({
+      .map((vendor): PlatformAccount => ({
         id: vendor.id,
         type: "SELLER" as const,
         email: "-",
