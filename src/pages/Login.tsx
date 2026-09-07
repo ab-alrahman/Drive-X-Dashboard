@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Link, useNavigate } from "react-router";
+import { Link, useNavigate, useSearchParams } from "react-router";
 import { Eye, EyeOff, LogIn, Car, ArrowLeft, Mail, Lock, Shield, User } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -20,6 +20,13 @@ export default function Login() {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  // Where to land after a successful customer login (set by protected pages that
+  // redirect here, e.g. /request-service). Only same-site paths are honoured.
+  const nextPath = (() => {
+    const raw = searchParams.get("next");
+    return raw && raw.startsWith("/") && !raw.startsWith("//") ? raw : null;
+  })();
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -43,7 +50,7 @@ export default function Login() {
         navigate("/dashboard");
       } else {
         await loginCustomer(email, password);
-        navigate("/inventory");
+        navigate(nextPath ?? "/inventory");
       }
     } catch (error) {
       setError(localizeError(error, t, "loginFailed"));

@@ -10,6 +10,7 @@ import Register from './pages/Register'
 import VendorRegister from './pages/VendorRegister'
 import Inventory from './pages/Inventory'
 import CarDetail from './pages/CarDetail'
+import RequestService from './pages/RequestService'
 import Dashboard from './pages/Dashboard'
 import CustomerDashboard from './pages/CustomerDashboard'
 import MaintenanceShops from './pages/MaintenanceShops'
@@ -36,6 +37,7 @@ export default function App() {
           <Route path="/vendor-register" element={<VendorRegister />} />
           <Route path="/inventory" element={<Inventory />} />
           <Route path="/car/:id" element={<CarDetail />} />
+          <Route path="/request-service" element={<RequestService />} />
           <Route path="/dashboard" element={<RequireAuth role="admin"><Dashboard /></RequireAuth>} />
           <Route path="/maintenance-shops" element={<RequireAuth role="admin"><MaintenanceShops /></RequireAuth>} />
           <Route path="/my-dashboard" element={<RequireAuth role="customer"><CustomerDashboard /></RequireAuth>} />
