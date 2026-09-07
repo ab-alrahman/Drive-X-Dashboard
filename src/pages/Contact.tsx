@@ -8,6 +8,8 @@ import { useI18n } from "@/lib/i18n";
 
 export default function Contact() {
   const { t } = useI18n();
+  const footerPhone = "+963 965 345 678";
+  const footerEmail = "admin@drivex.com";
   const [formData, setFormData] = useState({
     name: "",
     email: "",
@@ -34,7 +36,7 @@ export default function Contact() {
       .filter((line) => line !== null)
       .join("\n");
 
-    window.location.href = `mailto:info@drivex.com?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
+    window.location.href = `mailto:${footerEmail}?subject=${encodeURIComponent(subjectLine)}&body=${encodeURIComponent(body)}`;
 
     setIsSubmitted(true);
     setTimeout(() => setIsSubmitted(false), 5000);
@@ -44,20 +46,17 @@ export default function Contact() {
     {
       icon: MapPin,
       labelKey: "visitUs" as const,
-      value: "King Fahd Road, Riyadh 11321",
-      sub: "Saudi Arabia",
+      value: t("footerAddress"),
     },
     {
       icon: Phone,
       labelKey: "callUs" as const,
-      value: "+966 11 234 5678",
-      sub: "Mon - Sat: 9:00 - 21:00",
+      value: footerPhone,
     },
     {
       icon: Mail,
       labelKey: "emailUs" as const,
-      value: "info@drivex.com",
-      sub: "sales@drivex.com",
+      value: footerEmail,
     },
     {
       icon: Clock,
@@ -97,7 +96,7 @@ export default function Contact() {
                   <div>
                     <p className="text-white/50 text-sm">{t(info.labelKey)}</p>
                     <p className="text-white font-semibold">{info.value}</p>
-                    <p className="text-white/60 text-sm">{info.sub}</p>
+                    {info.sub && <p className="text-white/60 text-sm">{info.sub}</p>}
                   </div>
                 </div>
               </div>
@@ -114,7 +113,7 @@ export default function Contact() {
                 </div>
               </div>
               <p className="text-white/60 text-sm leading-relaxed">
-                {t("showroomExperienceDesc")}
+                {t("footerDescription")}
               </p>
             </div>
           </div>
@@ -159,7 +158,7 @@ export default function Contact() {
                       <label className="text-white/70 text-sm mb-2 block">{t("phoneNumber")}</label>
                       <Input
                         type="tel"
-                        placeholder="+966 11 234 5678"
+                        placeholder="+963 965 345 678"
                         value={formData.phone}
                         onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                         className="bg-dark border-gold/20 text-white placeholder:text-white/30 focus:border-gold"
@@ -207,7 +206,7 @@ export default function Contact() {
             <div className="text-center">
               <MapPin className="w-12 h-12 text-gold/40 mx-auto mb-3" />
               <p className="text-white font-bold text-lg">Drive X Showroom</p>
-              <p className="text-white/60">King Fahd Road, Riyadh 11321, Saudi Arabia</p>
+              <p className="text-white/60">{t("footerAddress")}</p>
               <Link to="/inventory">
                 <Button className="mt-4 bg-gold hover:bg-gold-light text-dark">
                   {t("scheduleVisit")}

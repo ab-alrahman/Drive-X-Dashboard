@@ -5,7 +5,6 @@ import { useI18n, type MessageKey } from "@/lib/i18n";
 
 export default function Footer() {
   const { t } = useI18n();
-  const currentYear = new Date().getFullYear();
 
   const scrollToTop = () => {
     window.scrollTo({ top: 0, behavior: "smooth" });
